@@ -106,6 +106,26 @@ async function addContactToSequence(sequenceId, contactId, emailAccountId, apiKe
   return res.data;
 }
 
+// Search for a company by name
+async function searchCompanyByName(name, apiKey) {
+  const res = await axios.post(
+    `${APOLLO_BASE}/mixed_companies/search`,
+    { q_organization_name: name, per_page: 1 },
+    { headers: getHeaders(apiKey) }
+  );
+  return (res.data.organizations || [])[0] || null;
+}
+
+// Enrich a person by their Apollo ID to get email
+async function enrichPersonById(apolloId, apiKey) {
+  const res = await axios.post(
+    `${APOLLO_BASE}/people/match`,
+    { id: apolloId },
+    { headers: getHeaders(apiKey) }
+  );
+  return res.data.person || null;
+}
+
 // Get connected email accounts
 async function getEmailAccounts(apiKey) {
   const res = await axios.get(
@@ -135,6 +155,8 @@ module.exports = {
   enrichContact,
   enrichOrganization,
   findCEO,
+  searchCompanyByName,
+  enrichPersonById,
   upsertContact,
   upsertAccount,
   searchSequences,

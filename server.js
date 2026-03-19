@@ -2,7 +2,7 @@ require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 const path = require('path');
-const { runOutreachSequence } = require('./src/sequenceManager');
+const { runOutreachSequence, runOutreachByCompany } = require('./src/sequenceManager');
 const { buildEmailSequence } = require('./src/emailGenerator');
 const apollo = require('./src/apollo');
 
@@ -65,6 +65,26 @@ app.post('/api/preview', async (req, res) => {
       },
       emailSequence,
     });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Company lookup endpoint — enrich by name, find CEO, auto-add to CRM and sequence
+app.post('/api/company', async (req, res) => {
+  const { companyName, senderName, apiKey } = req.body;
+  if (!companyName) return res.status(400).json({ error: 'companyName is required' });
+
+  const usedApiKey = apiKey || process.env.APOLLO_API_KEY;
+  if (!usedApiKey) return res.status(400).json({ error: 'Apollo API key is required' });
+
+  try {
+    const result = await runOutreachByCompany({
+      companyName,
+      senderName: senderName || 'Your Name',
+      apiKey: usedApiKey,
+    });
+    res.json(result);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
