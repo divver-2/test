@@ -258,7 +258,10 @@
     <h1>Outreach Hub</h1>
     <p>Type a company name — we'll find the CEO, enrich the data, and add them to Apollo automatically.</p>
   </div>
-  <div class="apollo-pill"><div class="pulse"></div> Apollo Connected</div>
+  <div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end">
+    <div class="apollo-pill"><div class="pulse"></div> Apollo Connected</div>
+    <div class="apollo-pill" style="background:rgba(16,185,129,0.1);border-color:rgba(16,185,129,0.22);color:#6ee7b7"><div class="pulse"></div> Affinity Connected</div>
+  </div>
 </div>
 
 <div class="container">
@@ -339,7 +342,8 @@
             <th>Email</th>
             <th>Industry</th>
             <th>Funding</th>
-            <th>CRM</th>
+            <th>Apollo CRM</th>
+            <th>Affinity</th>
             <th>Sequence</th>
             <th>Added</th>
           </tr>
@@ -421,6 +425,7 @@ async function addCompany() {
       funding:         data.company?.funding,
       fundingStage:    data.company?.fundingStage,
       crmAdded:        !!(data.apollo?.crmContactId),
+      affinityAdded:   !!(data.affinityCrm?.orgId),
       sequenceStarted: !!(data.apollo?.contactAdded),
       addedAt:         new Date().toISOString(),
     };
@@ -481,16 +486,23 @@ function renderResult(data) {
   }
 
   // Footer
+  const { affinityCrm } = data;
   const items = [
     {
       ok: !!apollo?.crmAccountId,
-      text: apollo?.crmAccountId ? '<strong>Company</strong> added to CRM' : 'Company not saved to CRM',
+      text: apollo?.crmAccountId ? '<strong>Company</strong> added to Apollo CRM' : 'Company not saved to Apollo CRM',
     },
     {
       ok: !!apollo?.crmContactId,
       text: apollo?.crmContactId
-        ? `<strong>CEO</strong> ${apollo.crmContactNew ? 'added to' : 'already in'} CRM`
-        : 'CEO not saved to CRM',
+        ? `<strong>CEO</strong> ${apollo.crmContactNew ? 'added to' : 'already in'} Apollo CRM`
+        : 'CEO not saved to Apollo CRM',
+    },
+    {
+      ok: !!affinityCrm?.orgId,
+      text: affinityCrm?.orgId
+        ? `<strong>Affinity</strong>: ${affinityCrm.orgCreated ? 'org created' : 'org matched'}${affinityCrm.personId ? (affinityCrm.personCreated ? ' · CEO added' : ' · CEO matched') : ''}`
+        : 'Not synced to Affinity',
     },
     {
       ok: !!apollo?.contactAdded,
@@ -522,7 +534,7 @@ function renderHistory() {
     `${history.length} compan${history.length === 1 ? 'y' : 'ies'}`;
 
   if (!history.length) {
-    tbody.innerHTML = `<tr><td colspan="8"><div class="empty"><span>🏢</span>No companies added yet.<br>Search above to get started.</div></td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="9"><div class="empty"><span>🏢</span>No companies added yet.<br>Search above to get started.</div></td></tr>`;
     return;
   }
 
@@ -547,6 +559,7 @@ function renderHistory() {
         <td><span style="color:var(--muted);font-size:0.8rem">${esc(cap(h.industry || '—'))}</span></td>
         <td>${h.funding ? `<span class="badge badge-accent">$${esc(h.funding)}</span>` : '<span style="color:var(--muted)">—</span>'}</td>
         <td>${h.crmAdded        ? '<span class="badge badge-green">✓ Added</span>'   : '<span class="badge badge-gray">—</span>'}</td>
+        <td>${h.affinityAdded   ? '<span class="badge badge-green">✓ Synced</span>'  : '<span class="badge badge-gray">—</span>'}</td>
         <td>${h.sequenceStarted ? '<span class="badge badge-green">✓ Started</span>' : '<span class="badge badge-gray">—</span>'}</td>
         <td class="td-date">${fmtDate(h.addedAt)}</td>
       </tr>`;

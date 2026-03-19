@@ -1,4 +1,5 @@
 const apollo = require('./apollo');
+const affinity = require('./affinity');
 const { buildEmailSequence, FOLLOWUP_DELAY_DAYS } = require('./emailGenerator');
 
 const SEQUENCE_NAME_PREFIX = 'CEO Outreach —';
@@ -13,6 +14,8 @@ async function runOutreachSequence({ email, senderName, apiKey }) {
     apolloSequence: null,
     crmAccount: null,
     crmContact: null,
+    affinityOrg: null,
+    affinityPerson: null,
     errors: [],
   };
 
@@ -87,7 +90,34 @@ async function runOutreachSequence({ email, senderName, apiKey }) {
     }
   }
 
-  // 8. Find or create the Apollo sequence
+  // 8. Sync to Affinity CRM
+  const affinityKey = process.env.AFFINITY_API_KEY;
+  if (affinityKey && results.organization) {
+    try {
+      const { org, created: orgCreated } = await affinity.upsertOrganization(
+        { name: orgName, domain },
+        affinityKey
+      );
+      results.affinityOrg = { ...org, wasCreated: orgCreated };
+
+      if (results.ceo) {
+        const { person, created: personCreated } = await affinity.upsertPerson(
+          {
+            firstName: results.ceo.first_name,
+            lastName: results.ceo.last_name,
+            email: ceoEmail,
+            organizationId: org.id,
+          },
+          affinityKey
+        );
+        results.affinityPerson = { ...person, wasCreated: personCreated };
+      }
+    } catch (e) {
+      results.errors.push(`Affinity sync failed: ${e.message}`);
+    }
+  }
+
+  // 9. Find or create the Apollo sequence
   try {
     const sequenceName = `${SEQUENCE_NAME_PREFIX} ${orgName}`;
     const existing = await apollo.searchSequences(sequenceName, apiKey);
@@ -102,7 +132,7 @@ async function runOutreachSequence({ email, senderName, apiKey }) {
     results.errors.push(`Sequence creation failed: ${e.message}`);
   }
 
-  // 9. Add CEO contact to the sequence
+  // 10. Add CEO contact to the sequence
   if (results.apolloSequence && results.crmContact) {
     try {
       const emailAccounts = await apollo.getEmailAccounts(apiKey);
@@ -143,6 +173,13 @@ async function runOutreachSequence({ email, senderName, apiKey }) {
       crmContactId: results.crmContact?.id,
       crmAccountId: results.crmAccount?.id,
     },
+    affinityCrm: {
+      orgId: results.affinityOrg?.id,
+      orgName: results.affinityOrg?.name,
+      orgCreated: results.affinityOrg?.wasCreated || false,
+      personId: results.affinityPerson?.id,
+      personCreated: results.affinityPerson?.wasCreated || false,
+    },
     errors: results.errors,
   };
 }
@@ -156,6 +193,8 @@ async function runOutreachByCompany({ companyName, senderName, apiKey }) {
     apolloSequence: null,
     crmAccount: null,
     crmContact: null,
+    affinityOrg: null,
+    affinityPerson: null,
     errors: [],
   };
 
@@ -238,7 +277,34 @@ async function runOutreachByCompany({ companyName, senderName, apiKey }) {
     }
   }
 
-  // 7. Find or create sequence
+  // 7. Sync to Affinity CRM
+  const affinityKey = process.env.AFFINITY_API_KEY;
+  if (affinityKey && results.organization) {
+    try {
+      const { org, created: orgCreated } = await affinity.upsertOrganization(
+        { name: orgName, domain },
+        affinityKey
+      );
+      results.affinityOrg = { ...org, wasCreated: orgCreated };
+
+      if (results.ceo) {
+        const { person, created: personCreated } = await affinity.upsertPerson(
+          {
+            firstName: results.ceo.first_name,
+            lastName: results.ceo.last_name,
+            email: ceoEmail,
+            organizationId: org.id,
+          },
+          affinityKey
+        );
+        results.affinityPerson = { ...person, wasCreated: personCreated };
+      }
+    } catch (e) {
+      results.errors.push(`Affinity sync failed: ${e.message}`);
+    }
+  }
+
+  // 8. Find or create sequence
   try {
     const sequenceName = `${SEQUENCE_NAME_PREFIX} ${orgName}`;
     const existing = await apollo.searchSequences(sequenceName, apiKey);
@@ -253,7 +319,7 @@ async function runOutreachByCompany({ companyName, senderName, apiKey }) {
     results.errors.push(`Sequence creation failed: ${e.message}`);
   }
 
-  // 8. Add CEO to sequence
+  // 9. Add CEO to sequence
   if (results.apolloSequence && results.crmContact) {
     try {
       const emailAccounts = await apollo.getEmailAccounts(apiKey);
@@ -299,6 +365,13 @@ async function runOutreachByCompany({ companyName, senderName, apiKey }) {
       crmContactId: results.crmContact?.id,
       crmContactNew: results.crmContact?.wasCreated || false,
       crmAccountId: results.crmAccount?.id,
+    },
+    affinityCrm: {
+      orgId: results.affinityOrg?.id,
+      orgName: results.affinityOrg?.name,
+      orgCreated: results.affinityOrg?.wasCreated || false,
+      personId: results.affinityPerson?.id,
+      personCreated: results.affinityPerson?.wasCreated || false,
     },
     errors: results.errors,
   };
