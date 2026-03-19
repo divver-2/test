@@ -5,6 +5,7 @@ const path = require('path');
 const { runOutreachSequence, runOutreachByCompany } = require('./src/sequenceManager');
 const { buildEmailSequence } = require('./src/emailGenerator');
 const apollo = require('./src/apollo');
+const affinity = require('./src/affinity');
 
 const app = express();
 app.use(cors());
@@ -105,6 +106,22 @@ app.post('/api/launch', async (req, res) => {
       apiKey: usedApiKey,
     });
     res.json(result);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Mark a company as Connected in Affinity (updates priority field)
+app.post('/api/affinity/mark-connected', async (req, res) => {
+  const { priorityFieldValueId, connectedOptionId } = req.body;
+  const affinityKey = process.env.AFFINITY_API_KEY;
+  if (!affinityKey) return res.status(400).json({ error: 'Affinity API key not configured' });
+  if (!priorityFieldValueId || !connectedOptionId) {
+    return res.status(400).json({ error: 'priorityFieldValueId and connectedOptionId are required' });
+  }
+  try {
+    await affinity.markConnected({ priorityFieldValueId, connectedOptionId }, affinityKey);
+    res.json({ success: true });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

@@ -96,6 +96,14 @@
     }
     .btn-primary { background: var(--accent); color: #fff; }
     .btn-primary:hover:not(:disabled) { background: var(--accent-hover); transform: translateY(-1px); box-shadow: 0 4px 14px rgba(99,102,241,0.35); }
+    .btn-connected {
+      padding: 5px 12px; border-radius: 6px; border: 1px solid var(--green-border);
+      background: var(--green-soft); color: var(--green);
+      font-size: 0.77rem; font-weight: 600; cursor: pointer; white-space: nowrap;
+      transition: all 0.15s;
+    }
+    .btn-connected:hover:not(:disabled) { background: rgba(16,185,129,0.2); }
+    .btn-connected:disabled { opacity: 0.45; cursor: not-allowed; }
     .btn:disabled { opacity: 0.45; cursor: not-allowed; transform: none !important; box-shadow: none !important; }
 
     /* ── Status banner ── */
@@ -346,6 +354,7 @@
             <th>Affinity</th>
             <th>Sequence</th>
             <th>Added</th>
+            <th></th>
           </tr>
         </thead>
         <tbody id="historyBody"></tbody>
@@ -415,19 +424,25 @@ async function addCompany() {
     renderResult(data);
 
     const entry = {
-      company:         data.company?.name || companyName,
-      domain:          data.company?.domain,
-      logo:            data.company?.logo,
-      ceoName:         data.ceo?.name,
-      ceoEmail:        data.ceo?.email,
-      emailVerified:   data.ceo?.emailVerified,
-      industry:        data.company?.industry,
-      funding:         data.company?.funding,
-      fundingStage:    data.company?.fundingStage,
-      crmAdded:        !!(data.apollo?.crmContactId),
-      affinityAdded:   !!(data.affinityCrm?.orgId),
-      sequenceStarted: !!(data.apollo?.contactAdded),
-      addedAt:         new Date().toISOString(),
+      company:                data.company?.name || companyName,
+      domain:                 data.company?.domain,
+      logo:                   data.company?.logo,
+      ceoName:                data.ceo?.name,
+      ceoEmail:               data.ceo?.email,
+      emailVerified:          data.ceo?.emailVerified,
+      industry:               data.company?.industry,
+      funding:                data.company?.funding,
+      fundingStage:           data.company?.fundingStage,
+      crmAdded:               !!(data.apollo?.crmContactId),
+      affinityAdded:          !!(data.affinityCrm?.orgId),
+      affinityInList:         !!(data.affinityCrm?.listEntryId),
+      affinityListName:       data.affinityCrm?.listName || null,
+      affinityOwnerSet:       data.affinityCrm?.ownerSet || false,
+      priorityFieldValueId:   data.affinityCrm?.priorityFieldValueId || null,
+      connectedOptionId:      data.affinityCrm?.connectedOptionId || null,
+      affinityConnected:      false,
+      sequenceStarted:        !!(data.apollo?.contactAdded),
+      addedAt:                new Date().toISOString(),
     };
     history.push(entry);
     localStorage.setItem('outreach_history', JSON.stringify(history));
@@ -499,10 +514,12 @@ function renderResult(data) {
         : 'CEO not saved to Apollo CRM',
     },
     {
-      ok: !!affinityCrm?.orgId,
-      text: affinityCrm?.orgId
-        ? `<strong>Affinity</strong>: ${affinityCrm.orgCreated ? 'org created' : 'org matched'}${affinityCrm.personId ? (affinityCrm.personCreated ? ' · CEO added' : ' · CEO matched') : ''}`
-        : 'Not synced to Affinity',
+      ok: !!affinityCrm?.listEntryId,
+      text: affinityCrm?.listEntryId
+        ? `<strong>Affinity</strong>: added to ${esc(affinityCrm.listName || 'sourcing list')}${affinityCrm.ownerSet ? ' · owner set' : ''} · priority → Chasing`
+        : affinityCrm?.orgId
+          ? `<strong>Affinity</strong>: org synced (list add failed)`
+          : 'Not synced to Affinity',
     },
     {
       ok: !!apollo?.contactAdded,
@@ -534,11 +551,12 @@ function renderHistory() {
     `${history.length} compan${history.length === 1 ? 'y' : 'ies'}`;
 
   if (!history.length) {
-    tbody.innerHTML = `<tr><td colspan="9"><div class="empty"><span>🏢</span>No companies added yet.<br>Search above to get started.</div></td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="10"><div class="empty"><span>🏢</span>No companies added yet.<br>Search above to get started.</div></td></tr>`;
     return;
   }
 
-  tbody.innerHTML = history.slice().reverse().map(h => {
+  tbody.innerHTML = history.slice().reverse().map((h, i) => {
+    const origIdx = history.length - 1 - i;
     const init = (h.company || '?')[0].toUpperCase();
     const logoHtml = h.logo
       ? `<img src="${esc(h.logo)}" onerror="this.parentElement.textContent='${init}'" />`
@@ -559,11 +577,53 @@ function renderHistory() {
         <td><span style="color:var(--muted);font-size:0.8rem">${esc(cap(h.industry || '—'))}</span></td>
         <td>${h.funding ? `<span class="badge badge-accent">$${esc(h.funding)}</span>` : '<span style="color:var(--muted)">—</span>'}</td>
         <td>${h.crmAdded        ? '<span class="badge badge-green">✓ Added</span>'   : '<span class="badge badge-gray">—</span>'}</td>
-        <td>${h.affinityAdded   ? '<span class="badge badge-green">✓ Synced</span>'  : '<span class="badge badge-gray">—</span>'}</td>
+        <td>${h.affinityInList
+          ? h.affinityConnected
+            ? '<span class="badge badge-green">✓ Connected</span>'
+            : `<span class="badge badge-accent">Chasing${h.affinityOwnerSet ? ' · owned' : ''}</span>`
+          : h.affinityAdded
+            ? '<span class="badge badge-gray">Synced</span>'
+            : '<span class="badge badge-gray">—</span>'
+        }</td>
         <td>${h.sequenceStarted ? '<span class="badge badge-green">✓ Started</span>' : '<span class="badge badge-gray">—</span>'}</td>
         <td class="td-date">${fmtDate(h.addedAt)}</td>
+        <td>${h.affinityInList && !h.affinityConnected && h.priorityFieldValueId
+          ? `<button class="btn btn-connected" onclick="markConnected(${origIdx})">Mark Connected</button>`
+          : ''
+        }</td>
       </tr>`;
   }).join('');
+}
+
+// ── Mark Connected ────────────────────────────────────────
+async function markConnected(historyIdx) {
+  const entry = history[historyIdx];
+  if (!entry) return;
+
+  const btn = event.target;
+  btn.disabled = true;
+  btn.textContent = 'Updating…';
+
+  try {
+    const res = await fetch('/api/affinity/mark-connected', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        priorityFieldValueId: entry.priorityFieldValueId,
+        connectedOptionId: entry.connectedOptionId,
+      }),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Failed');
+
+    history[historyIdx].affinityConnected = true;
+    localStorage.setItem('outreach_history', JSON.stringify(history));
+    renderHistory();
+  } catch(e) {
+    btn.disabled = false;
+    btn.textContent = 'Mark Connected';
+    alert('Could not update Affinity: ' + e.message);
+  }
 }
 
 // ── Init ──────────────────────────────────────────────────

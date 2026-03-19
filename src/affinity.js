@@ -4,6 +4,9 @@ const axios = require('axios');
 
 const BASE_URL = 'https://api.affinity.co';
 
+// Affinity entity type codes
+const ENTITY_TYPE = { ORGANIZATION: 0, PERSON: 1 };
+
 function getClient(apiKey) {
   return axios.create({
     baseURL: BASE_URL,
@@ -12,17 +15,16 @@ function getClient(apiKey) {
   });
 }
 
-// Find an organization in Affinity by name, return first match or null
+// ── Organizations ─────────────────────────────────────────────────────────────
+
 async function findOrganization(name, apiKey) {
   const client = getClient(apiKey);
   const res = await client.get('/organizations', { params: { term: name, page_size: 5 } });
   const orgs = res.data?.organizations || [];
-  // Match by exact name first, then fallback to first result
   const exact = orgs.find(o => o.name?.toLowerCase() === name.toLowerCase());
   return exact || orgs[0] || null;
 }
 
-// Create a new organization in Affinity
 async function createOrganization({ name, domain }, apiKey) {
   const client = getClient(apiKey);
   const payload = { name };
@@ -31,7 +33,6 @@ async function createOrganization({ name, domain }, apiKey) {
   return res.data;
 }
 
-// Find or create an organization — returns { org, created }
 async function upsertOrganization({ name, domain }, apiKey) {
   const existing = await findOrganization(name, apiKey);
   if (existing) return { org: existing, created: false };
@@ -39,7 +40,8 @@ async function upsertOrganization({ name, domain }, apiKey) {
   return { org, created: true };
 }
 
-// Find a person in Affinity by name, return first match or null
+// ── Persons ───────────────────────────────────────────────────────────────────
+
 async function findPerson(firstName, lastName, apiKey) {
   const client = getClient(apiKey);
   const term = `${firstName || ''} ${lastName || ''}`.trim();
@@ -52,20 +54,15 @@ async function findPerson(firstName, lastName, apiKey) {
   return exact || people[0] || null;
 }
 
-// Create a new person in Affinity, optionally linked to an org
 async function createPerson({ firstName, lastName, email, organizationId }, apiKey) {
   const client = getClient(apiKey);
-  const payload = {
-    first_name: firstName,
-    last_name: lastName,
-  };
+  const payload = { first_name: firstName, last_name: lastName };
   if (email) payload.emails = [email];
   if (organizationId) payload.organization_ids = [organizationId];
   const res = await client.post('/persons', payload);
   return res.data;
 }
 
-// Find or create a person — returns { person, created }
 async function upsertPerson({ firstName, lastName, email, organizationId }, apiKey) {
   const existing = await findPerson(firstName, lastName, apiKey);
   if (existing) return { person: existing, created: false };
@@ -73,4 +70,193 @@ async function upsertPerson({ firstName, lastName, email, organizationId }, apiK
   return { person, created: true };
 }
 
-module.exports = { upsertOrganization, upsertPerson };
+// ── Users ─────────────────────────────────────────────────────────────────────
+
+// Get all users in the Affinity workspace
+async function getUsers(apiKey) {
+  const client = getClient(apiKey);
+  try {
+    const res = await client.get('/users');
+    return res.data || [];
+  } catch {
+    // Fall back to whoami if /users isn't available
+    const me = await getClient(apiKey).get('/auth/whoami');
+    return me.data ? [me.data] : [];
+  }
+}
+
+// Find user whose name matches the sender (fuzzy)
+async function findUserByName(name, apiKey) {
+  if (!name) return null;
+  const users = await getUsers(apiKey);
+  const needle = name.toLowerCase().trim();
+  return (
+    users.find(u => {
+      const full = `${u.first_name || ''} ${u.last_name || ''}`.trim().toLowerCase();
+      return full === needle || full.startsWith(needle) || needle.startsWith(full);
+    }) || null
+  );
+}
+
+// ── Lists ─────────────────────────────────────────────────────────────────────
+
+async function getLists(apiKey) {
+  const client = getClient(apiKey);
+  const res = await client.get('/lists');
+  return res.data || [];
+}
+
+// Find the sourcing list — looks for a list whose name contains "sourcing"
+async function getSourcingList(apiKey) {
+  const lists = await getLists(apiKey);
+  return (
+    lists.find(l => l.name?.toLowerCase().includes('sourcing')) ||
+    lists.find(l => l.type === 8) || // type 8 = companies list in Affinity
+    lists[0] ||
+    null
+  );
+}
+
+// Add an organization to a list, returns the new list entry
+async function addOrgToList(listId, orgId, apiKey) {
+  const client = getClient(apiKey);
+  const res = await client.post('/list-entries', {
+    list_id: listId,
+    entity_id: orgId,
+    entity_type: ENTITY_TYPE.ORGANIZATION,
+  });
+  return res.data;
+}
+
+// ── Fields & Field Values ─────────────────────────────────────────────────────
+
+async function getListFields(listId, apiKey) {
+  const client = getClient(apiKey);
+  const res = await client.get('/fields', { params: { list_id: listId } });
+  return res.data || [];
+}
+
+async function setFieldValue({ fieldId, entityId, listEntryId, value }, apiKey) {
+  const client = getClient(apiKey);
+  const res = await client.post('/field-values', {
+    field_id: fieldId,
+    entity_id: entityId,
+    list_entry_id: listEntryId,
+    value,
+  });
+  return res.data;
+}
+
+async function updateFieldValue(fieldValueId, value, apiKey) {
+  const client = getClient(apiKey);
+  const res = await client.patch(`/field-values/${fieldValueId}`, { value });
+  return res.data;
+}
+
+// ── High-level: add to sourcing list + set owner & priority ───────────────────
+
+async function addToSourcingList({ orgId, senderName }, apiKey) {
+  const out = {
+    list: null,
+    listEntry: null,
+    ownerSet: false,
+    priorityFieldValueId: null,
+    connectedOptionId: null,
+    errors: [],
+  };
+
+  // 1. Find the sourcing list
+  out.list = await getSourcingList(apiKey);
+  if (!out.list) {
+    out.errors.push('No sourcing list found in Affinity');
+    return out;
+  }
+
+  // 2. Add org to the list
+  try {
+    out.listEntry = await addOrgToList(out.list.id, orgId, apiKey);
+  } catch (e) {
+    // Might already be in the list — try to continue
+    out.errors.push(`Add to list: ${e.response?.data?.message || e.message}`);
+  }
+
+  if (!out.listEntry) return out;
+
+  // 3. Get fields for this list
+  let fields = [];
+  try {
+    fields = await getListFields(out.list.id, apiKey);
+  } catch (e) {
+    out.errors.push(`Fetch fields: ${e.message}`);
+    return out;
+  }
+
+  const ownerField = fields.find(f => f.name?.toLowerCase().includes('owner'));
+  const priorityField = fields.find(f =>
+    f.name?.toLowerCase().includes('priority') ||
+    f.name?.toLowerCase().includes('status')
+  );
+
+  // 4. Set global owner from senderName
+  if (ownerField && senderName) {
+    try {
+      const user = await findUserByName(senderName, apiKey);
+      if (user) {
+        await setFieldValue({
+          fieldId: ownerField.id,
+          entityId: orgId,
+          listEntryId: out.listEntry.id,
+          value: user.id,
+        }, apiKey);
+        out.ownerSet = true;
+      }
+    } catch (e) {
+      out.errors.push(`Set owner: ${e.message}`);
+    }
+  }
+
+  // 5. Set priority to "Chasing"
+  if (priorityField?.dropdown_options) {
+    const chasingOption = priorityField.dropdown_options.find(
+      o => o.text?.toLowerCase().includes('chasing')
+    );
+    const connectedOption = priorityField.dropdown_options.find(
+      o => o.text?.toLowerCase().includes('connect')
+    );
+
+    if (chasingOption) {
+      try {
+        const fv = await setFieldValue({
+          fieldId: priorityField.id,
+          entityId: orgId,
+          listEntryId: out.listEntry.id,
+          value: chasingOption.id,
+        }, apiKey);
+        out.priorityFieldValueId = fv?.id || null;
+      } catch (e) {
+        out.errors.push(`Set priority: ${e.message}`);
+      }
+    }
+
+    if (connectedOption) {
+      out.connectedOptionId = connectedOption.id;
+    }
+  }
+
+  return out;
+}
+
+// ── Mark as Connected ─────────────────────────────────────────────────────────
+
+async function markConnected({ priorityFieldValueId, connectedOptionId }, apiKey) {
+  if (!priorityFieldValueId) throw new Error('No priority field value ID stored');
+  if (!connectedOptionId) throw new Error('No "Connected" option ID stored');
+  return updateFieldValue(priorityFieldValueId, connectedOptionId, apiKey);
+}
+
+module.exports = {
+  upsertOrganization,
+  upsertPerson,
+  addToSourcingList,
+  markConnected,
+};

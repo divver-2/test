@@ -16,6 +16,7 @@ async function runOutreachSequence({ email, senderName, apiKey }) {
     crmContact: null,
     affinityOrg: null,
     affinityPerson: null,
+    affinityList: null,
     errors: [],
   };
 
@@ -112,6 +113,12 @@ async function runOutreachSequence({ email, senderName, apiKey }) {
         );
         results.affinityPerson = { ...person, wasCreated: personCreated };
       }
+
+      // Add to sourcing list, set global owner + priority = Chasing
+      results.affinityList = await affinity.addToSourcingList(
+        { orgId: org.id, senderName },
+        affinityKey
+      );
     } catch (e) {
       results.errors.push(`Affinity sync failed: ${e.message}`);
     }
@@ -179,6 +186,13 @@ async function runOutreachSequence({ email, senderName, apiKey }) {
       orgCreated: results.affinityOrg?.wasCreated || false,
       personId: results.affinityPerson?.id,
       personCreated: results.affinityPerson?.wasCreated || false,
+      listId: results.affinityList?.list?.id || null,
+      listName: results.affinityList?.list?.name || null,
+      listEntryId: results.affinityList?.listEntry?.id || null,
+      ownerSet: results.affinityList?.ownerSet || false,
+      priorityFieldValueId: results.affinityList?.priorityFieldValueId || null,
+      connectedOptionId: results.affinityList?.connectedOptionId || null,
+      sourcingErrors: results.affinityList?.errors || [],
     },
     errors: results.errors,
   };
@@ -195,6 +209,7 @@ async function runOutreachByCompany({ companyName, senderName, apiKey }) {
     crmContact: null,
     affinityOrg: null,
     affinityPerson: null,
+    affinityList: null,
     errors: [],
   };
 
@@ -299,6 +314,12 @@ async function runOutreachByCompany({ companyName, senderName, apiKey }) {
         );
         results.affinityPerson = { ...person, wasCreated: personCreated };
       }
+
+      // Add to sourcing list, set global owner + priority = Chasing
+      results.affinityList = await affinity.addToSourcingList(
+        { orgId: org.id, senderName },
+        affinityKey
+      );
     } catch (e) {
       results.errors.push(`Affinity sync failed: ${e.message}`);
     }
@@ -372,6 +393,13 @@ async function runOutreachByCompany({ companyName, senderName, apiKey }) {
       orgCreated: results.affinityOrg?.wasCreated || false,
       personId: results.affinityPerson?.id,
       personCreated: results.affinityPerson?.wasCreated || false,
+      listId: results.affinityList?.list?.id || null,
+      listName: results.affinityList?.list?.name || null,
+      listEntryId: results.affinityList?.listEntry?.id || null,
+      ownerSet: results.affinityList?.ownerSet || false,
+      priorityFieldValueId: results.affinityList?.priorityFieldValueId || null,
+      connectedOptionId: results.affinityList?.connectedOptionId || null,
+      sourcingErrors: results.affinityList?.errors || [],
     },
     errors: results.errors,
   };
