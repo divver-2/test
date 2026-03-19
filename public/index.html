@@ -1,0 +1,501 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>CEO Outreach Tool</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #0f1117;
+      --surface: #1a1d27;
+      --surface2: #22263a;
+      --border: #2e3250;
+      --accent: #6366f1;
+      --accent-hover: #818cf8;
+      --green: #22c55e;
+      --red: #ef4444;
+      --yellow: #f59e0b;
+      --text: #e2e8f0;
+      --muted: #94a3b8;
+      --radius: 10px;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 40px 16px 80px;
+    }
+
+    header {
+      text-align: center;
+      margin-bottom: 40px;
+    }
+    header h1 { font-size: 2rem; font-weight: 700; letter-spacing: -0.5px; }
+    header p { color: var(--muted); margin-top: 8px; font-size: 0.95rem; }
+
+    .container { width: 100%; max-width: 780px; }
+
+    /* Card */
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 24px;
+      margin-bottom: 20px;
+    }
+    .card h2 { font-size: 1rem; font-weight: 600; margin-bottom: 16px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; }
+
+    /* Form */
+    .form-row { display: flex; gap: 12px; flex-wrap: wrap; }
+    .form-group { display: flex; flex-direction: column; gap: 6px; flex: 1; min-width: 200px; }
+    label { font-size: 0.85rem; color: var(--muted); }
+    input[type="email"], input[type="text"], input[type="password"] {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 10px 14px;
+      color: var(--text);
+      font-size: 0.95rem;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+    input:focus { border-color: var(--accent); }
+    input::placeholder { color: var(--muted); }
+
+    /* Buttons */
+    .btn-row { display: flex; gap: 12px; margin-top: 16px; flex-wrap: wrap; }
+    button {
+      padding: 10px 22px;
+      border-radius: 8px;
+      border: none;
+      cursor: pointer;
+      font-size: 0.95rem;
+      font-weight: 600;
+      transition: all 0.2s;
+    }
+    .btn-primary { background: var(--accent); color: #fff; }
+    .btn-primary:hover { background: var(--accent-hover); }
+    .btn-success { background: var(--green); color: #fff; }
+    .btn-success:hover { filter: brightness(1.1); }
+    button:disabled { opacity: 0.5; cursor: not-allowed; }
+
+    /* Company info bar */
+    .company-bar {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      padding: 16px;
+      background: var(--surface2);
+      border-radius: var(--radius);
+      margin-bottom: 20px;
+      border: 1px solid var(--border);
+    }
+    .company-bar img {
+      width: 44px; height: 44px; border-radius: 8px;
+      object-fit: contain; background: #fff; padding: 4px;
+    }
+    .company-bar .logo-placeholder {
+      width: 44px; height: 44px; border-radius: 8px;
+      background: var(--accent); display: flex; align-items: center; justify-content: center;
+      font-size: 1.2rem; font-weight: 700; color: #fff;
+    }
+    .company-bar .info h3 { font-size: 1rem; font-weight: 700; }
+    .company-bar .info p { font-size: 0.82rem; color: var(--muted); margin-top: 2px; }
+    .tags { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 6px; }
+    .tag {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      padding: 2px 10px;
+      font-size: 0.75rem;
+      color: var(--muted);
+    }
+
+    /* CEO card */
+    .ceo-card {
+      display: flex; align-items: center; gap: 14px;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 14px 16px;
+      margin-bottom: 20px;
+    }
+    .ceo-avatar {
+      width: 42px; height: 42px; border-radius: 50%;
+      background: linear-gradient(135deg, var(--accent), #a78bfa);
+      display: flex; align-items: center; justify-content: center;
+      font-weight: 700; font-size: 1rem; color: #fff; flex-shrink: 0;
+    }
+    .ceo-card .info h3 { font-size: 0.95rem; font-weight: 700; }
+    .ceo-card .info p { font-size: 0.82rem; color: var(--muted); }
+
+    /* Sequence timeline */
+    .timeline { position: relative; padding-left: 28px; }
+    .timeline::before {
+      content: '';
+      position: absolute; left: 9px; top: 20px; bottom: 0;
+      width: 2px; background: var(--border);
+    }
+    .timeline-item { position: relative; margin-bottom: 20px; }
+    .timeline-dot {
+      position: absolute; left: -24px; top: 16px;
+      width: 12px; height: 12px; border-radius: 50%;
+      background: var(--accent); border: 2px solid var(--bg);
+      z-index: 1;
+    }
+    .timeline-item:first-child .timeline-dot { background: var(--green); }
+
+    .email-card {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      overflow: hidden;
+    }
+    .email-card-header {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--border);
+      cursor: pointer;
+      user-select: none;
+    }
+    .email-card-header:hover { background: rgba(255,255,255,0.03); }
+    .email-card-header .left { display: flex; align-items: center; gap: 10px; }
+    .email-label {
+      font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.06em;
+      color: #fff; padding: 2px 8px; border-radius: 999px;
+    }
+    .label-initial { background: var(--green); }
+    .label-followup { background: var(--accent); }
+    .email-card-header .subject { font-size: 0.9rem; font-weight: 600; }
+    .email-card-header .delay { font-size: 0.8rem; color: var(--muted); }
+    .chevron { font-size: 0.8rem; color: var(--muted); transition: transform 0.2s; }
+    .chevron.open { transform: rotate(180deg); }
+
+    .email-body {
+      padding: 16px;
+      display: none;
+    }
+    .email-body.open { display: block; }
+    .email-body textarea {
+      width: 100%;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 12px;
+      color: var(--text);
+      font-family: inherit;
+      font-size: 0.9rem;
+      line-height: 1.6;
+      resize: vertical;
+      min-height: 180px;
+      outline: none;
+    }
+    .email-body textarea:focus { border-color: var(--accent); }
+
+    /* Status banner */
+    .status-banner {
+      padding: 14px 18px;
+      border-radius: var(--radius);
+      margin-bottom: 20px;
+      display: none;
+      font-size: 0.9rem;
+    }
+    .status-banner.success { background: rgba(34,197,94,0.12); border: 1px solid rgba(34,197,94,0.3); color: var(--green); display: block; }
+    .status-banner.error { background: rgba(239,68,68,0.12); border: 1px solid rgba(239,68,68,0.3); color: var(--red); display: block; }
+    .status-banner.loading { background: rgba(99,102,241,0.12); border: 1px solid rgba(99,102,241,0.3); color: var(--accent-hover); display: block; }
+
+    /* CRM summary */
+    .crm-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; }
+    .crm-stat {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 14px;
+    }
+    .crm-stat .label { font-size: 0.75rem; color: var(--muted); margin-bottom: 4px; }
+    .crm-stat .value { font-size: 0.95rem; font-weight: 600; }
+    .crm-stat .value.ok { color: var(--green); }
+    .crm-stat .value.warn { color: var(--yellow); }
+
+    /* Spinner */
+    .spinner {
+      display: inline-block; width: 14px; height: 14px;
+      border: 2px solid rgba(255,255,255,0.3);
+      border-top-color: #fff;
+      border-radius: 50%;
+      animation: spin 0.7s linear infinite;
+      vertical-align: middle; margin-right: 6px;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .hidden { display: none !important; }
+    #results { display: none; }
+
+    /* Apollo badge */
+    .apollo-badge {
+      display: inline-flex; align-items: center; gap: 6px;
+      background: rgba(99,102,241,0.15); border: 1px solid rgba(99,102,241,0.3);
+      border-radius: 999px; padding: 3px 12px;
+      font-size: 0.78rem; color: var(--accent-hover);
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <h1>CEO Outreach Tool</h1>
+  <p>Enter any work email to generate a personalized CEO sequence and launch it in Apollo.</p>
+</header>
+
+<div class="container">
+
+  <!-- Input Card -->
+  <div class="card">
+    <h2>Lookup &amp; Configure</h2>
+    <div class="form-row">
+      <div class="form-group" style="flex:2">
+        <label for="emailInput">Work Email Address</label>
+        <input type="email" id="emailInput" placeholder="jane@company.com" />
+      </div>
+      <div class="form-group" style="flex:1">
+        <label for="senderName">Your Name</label>
+        <input type="text" id="senderName" placeholder="Alex Smith" />
+      </div>
+    </div>
+    <div class="form-row" style="margin-top:12px">
+      <div class="form-group">
+        <label for="apiKey">Apollo API Key <span style="color:var(--muted)">(or set via .env)</span></label>
+        <input type="password" id="apiKey" placeholder="Leave blank to use server .env key" />
+      </div>
+    </div>
+    <div class="btn-row">
+      <button class="btn-primary" id="previewBtn" onclick="runPreview()">
+        Preview Emails
+      </button>
+    </div>
+  </div>
+
+  <!-- Status -->
+  <div class="status-banner" id="statusBanner"></div>
+
+  <!-- Results -->
+  <div id="results">
+
+    <!-- Company + CEO info -->
+    <div class="company-bar" id="companyBar"></div>
+    <div class="ceo-card" id="ceoCard"></div>
+
+    <!-- Email Sequence -->
+    <div class="card">
+      <h2>Email Sequence &nbsp;<span class="apollo-badge">5 emails · every 1.5 months</span></h2>
+      <div class="timeline" id="timeline"></div>
+
+      <div class="btn-row" style="margin-top:24px">
+        <button class="btn-success" id="launchBtn" onclick="launchSequence()">
+          Launch in Apollo &amp; Add to CRM
+        </button>
+      </div>
+    </div>
+
+    <!-- CRM Result (shown after launch) -->
+    <div class="card hidden" id="crmResult">
+      <h2>Apollo CRM Summary</h2>
+      <div class="crm-grid" id="crmGrid"></div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+let currentData = null;
+
+function getInputs() {
+  return {
+    email: document.getElementById('emailInput').value.trim(),
+    senderName: document.getElementById('senderName').value.trim(),
+    apiKey: document.getElementById('apiKey').value.trim(),
+  };
+}
+
+function setStatus(msg, type) {
+  const b = document.getElementById('statusBanner');
+  b.className = `status-banner ${type}`;
+  b.innerHTML = msg;
+}
+
+function clearStatus() {
+  const b = document.getElementById('statusBanner');
+  b.className = 'status-banner';
+  b.innerHTML = '';
+}
+
+async function runPreview() {
+  const { email, senderName, apiKey } = getInputs();
+  if (!email) { setStatus('Please enter an email address.', 'error'); return; }
+
+  document.getElementById('results').style.display = 'none';
+  document.getElementById('crmResult').classList.add('hidden');
+  setStatus('<span class="spinner"></span> Looking up contact and company…', 'loading');
+  document.getElementById('previewBtn').disabled = true;
+
+  try {
+    const res = await fetch('/api/preview', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, senderName, apiKey }),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Preview failed');
+    currentData = data;
+    renderResults(data);
+    clearStatus();
+  } catch (e) {
+    setStatus('Error: ' + e.message, 'error');
+  } finally {
+    document.getElementById('previewBtn').disabled = false;
+  }
+}
+
+async function launchSequence() {
+  const { email, senderName, apiKey } = getInputs();
+  setStatus('<span class="spinner"></span> Launching sequence in Apollo and saving to CRM…', 'loading');
+  document.getElementById('launchBtn').disabled = true;
+
+  try {
+    const res = await fetch('/api/launch', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, senderName, apiKey }),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Launch failed');
+    renderCRMResult(data);
+    clearStatus();
+    setStatus('✅ Sequence launched! Contact and account saved to Apollo CRM.', 'success');
+  } catch (e) {
+    setStatus('Error: ' + e.message, 'error');
+  } finally {
+    document.getElementById('launchBtn').disabled = false;
+  }
+}
+
+function renderResults(data) {
+  // Company bar
+  const { company, ceo } = data;
+  const companyBar = document.getElementById('companyBar');
+  const logoHtml = company.logo
+    ? `<img src="${company.logo}" alt="logo" onerror="this.style.display='none'" />`
+    : `<div class="logo-placeholder">${(company.name || '?')[0].toUpperCase()}</div>`;
+  const tags = [company.industry, company.employees ? `${formatNum(company.employees)} employees` : null, company.domain]
+    .filter(Boolean)
+    .map(t => `<span class="tag">${t}</span>`)
+    .join('');
+  companyBar.innerHTML = `
+    ${logoHtml}
+    <div class="info">
+      <h3>${company.name || company.domain}</h3>
+      <p>${company.website || company.domain}</p>
+      <div class="tags">${tags}</div>
+    </div>`;
+
+  // CEO card
+  const ceoCard = document.getElementById('ceoCard');
+  const initials = ceo.name ? ceo.name.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase() : '?';
+  ceoCard.innerHTML = `
+    <div class="ceo-avatar">${initials}</div>
+    <div class="info">
+      <h3>${ceo.name || 'CEO not found'}</h3>
+      <p>${ceo.title || 'Chief Executive Officer'} · ${ceo.email ? `<a href="mailto:${ceo.email}" style="color:var(--accent-hover)">${ceo.email}</a>` : 'Email not found'}</p>
+    </div>`;
+
+  // Email timeline
+  const timeline = document.getElementById('timeline');
+  timeline.innerHTML = '';
+  data.emailSequence.forEach((email, i) => {
+    const isInitial = email.type === 'initial';
+    const delayLabel = isInitial ? 'Day 0 — Initial Outreach' : `Day ${email.delayDays} (~${Math.round(email.delayDays / 30 * 10) / 10} months)`;
+    const labelClass = isInitial ? 'label-initial' : 'label-followup';
+    const labelText = isInitial ? 'Initial' : `Follow-up ${i}`;
+
+    const item = document.createElement('div');
+    item.className = 'timeline-item';
+    item.innerHTML = `
+      <div class="timeline-dot"></div>
+      <div class="email-card">
+        <div class="email-card-header" onclick="toggleEmail(${i})">
+          <div class="left">
+            <span class="email-label ${labelClass}">${labelText}</span>
+            <span class="email-subject">${escapeHtml(email.subject)}</span>
+          </div>
+          <div style="display:flex;align-items:center;gap:12px">
+            <span class="delay">${delayLabel}</span>
+            <span class="chevron" id="chevron-${i}">▼</span>
+          </div>
+        </div>
+        <div class="email-body" id="body-${i}">
+          <textarea id="textarea-${i}">${escapeHtml(email.body)}</textarea>
+        </div>
+      </div>`;
+    timeline.appendChild(item);
+  });
+
+  // Auto-open first email
+  toggleEmail(0);
+
+  document.getElementById('results').style.display = 'block';
+}
+
+function toggleEmail(index) {
+  const body = document.getElementById(`body-${index}`);
+  const chevron = document.getElementById(`chevron-${index}`);
+  const isOpen = body.classList.contains('open');
+  body.classList.toggle('open', !isOpen);
+  chevron.classList.toggle('open', !isOpen);
+}
+
+function renderCRMResult(data) {
+  const grid = document.getElementById('crmGrid');
+  const { apollo } = data;
+  const stats = [
+    { label: 'Sequence', value: apollo.sequenceName || '—', cls: apollo.sequenceId ? 'ok' : 'warn' },
+    { label: 'Contact in CRM', value: apollo.crmContactId ? 'Saved ✓' : 'Not saved', cls: apollo.crmContactId ? 'ok' : 'warn' },
+    { label: 'Account in CRM', value: apollo.crmAccountId ? 'Saved ✓' : 'Not saved', cls: apollo.crmAccountId ? 'ok' : 'warn' },
+    { label: 'Added to Sequence', value: apollo.contactAdded ? 'Yes ✓' : 'No', cls: apollo.contactAdded ? 'ok' : 'warn' },
+    { label: 'Sequence Status', value: apollo.sequenceAlreadyExisted ? 'Existing' : 'Newly Created', cls: 'ok' },
+  ];
+  grid.innerHTML = stats.map(s => `
+    <div class="crm-stat">
+      <div class="label">${s.label}</div>
+      <div class="value ${s.cls}">${s.value}</div>
+    </div>`).join('');
+  document.getElementById('crmResult').classList.remove('hidden');
+}
+
+function formatNum(n) {
+  if (!n) return '';
+  if (n >= 1000) return (n / 1000).toFixed(1) + 'k';
+  return n;
+}
+
+function escapeHtml(str) {
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
+// Allow pressing Enter on email input to trigger preview
+document.getElementById('emailInput').addEventListener('keydown', e => {
+  if (e.key === 'Enter') runPreview();
+});
+</script>
+</body>
+</html>
