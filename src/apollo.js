@@ -132,6 +132,16 @@ async function enrichPersonById(apolloId, apiKey) {
   return res.data.person || null;
 }
 
+// Enrich a person by name + domain (works on free plan, consumes 1 email credit)
+async function enrichPersonByNameAndDomain(firstName, lastName, domain, apiKey) {
+  const res = await axios.post(
+    `${APOLLO_BASE}/people/match`,
+    { first_name: firstName, last_name: lastName, domain, reveal_personal_emails: true },
+    { headers: getHeaders(apiKey) }
+  );
+  return res.data.person || null;
+}
+
 // Get connected email accounts
 async function getEmailAccounts(apiKey) {
   const res = await axios.get(
@@ -163,6 +173,7 @@ module.exports = {
   findCEO,
   searchCompanyByName,
   enrichPersonById,
+  enrichPersonByNameAndDomain,
   upsertContact,
   upsertAccount,
   searchSequences,

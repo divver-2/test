@@ -203,20 +203,27 @@ async function runOutreachByCompany({ companyName, apiKey }) {
   const results = { organization: null, ceo: null, affinityData: null, errors: [] };
 
   // 1. Search for company to get domain
-  let domain = null;
-  try {
-    console.log('[Step 1] Searching company:', companyName);
-    const found = await apollo.searchCompanyByName(companyName, apiKey);
-    if (found) {
-      results.organization = found;
-      domain = found.primary_domain || found.domain;
-      console.log('[Step 1] Found:', found.name, '| domain:', domain);
-    } else {
-      console.log('[Step 1] No company found');
+  // If input looks like a domain (has a dot, no spaces), use it directly
+  const looksLikeDomain = companyName.includes('.') && !companyName.includes(' ');
+  let domain = looksLikeDomain ? companyName.toLowerCase() : null;
+
+  if (looksLikeDomain) {
+    console.log('[Step 1] Input looks like domain, using directly:', domain);
+  } else {
+    try {
+      console.log('[Step 1] Searching company:', companyName);
+      const found = await apollo.searchCompanyByName(companyName, apiKey);
+      if (found) {
+        results.organization = found;
+        domain = found.primary_domain || found.domain;
+        console.log('[Step 1] Found:', found.name, '| domain:', domain);
+      } else {
+        console.log('[Step 1] No company found');
+      }
+    } catch (e) {
+      console.error('[Step 1] FAILED:', e.message, e.response?.data);
+      results.errors.push(`Company search failed: ${e.message}`);
     }
-  } catch (e) {
-    console.error('[Step 1] FAILED:', e.message, e.response?.data);
-    results.errors.push(`Company search failed: ${e.message}`);
   }
 
   // 2. Enrich org for full details
@@ -234,22 +241,19 @@ async function runOutreachByCompany({ companyName, apiKey }) {
 
   const orgName = results.organization?.name || companyName;
 
-  // 3. Find CEO using org_chart_root_people_ids from enriched org (free-plan compatible)
+  // 3. Find CEO by domain, then enrich by name+domain for email (free-plan compatible)
   if (domain) {
     try {
       console.log('[Step 3] Finding CEO for domain:', domain);
-      const rootId = results.organization?.org_chart_root_people_ids?.[0];
-      if (rootId) {
-        console.log('[Step 3] CEO ID from org chart:', rootId);
-        results.ceo = await apollo.enrichPersonById(rootId, apiKey);
+      const ceoBasic = await apollo.findCEO(domain, apiKey);
+      if (ceoBasic?.first_name) {
+        console.log('[Step 3] CEO found:', ceoBasic.first_name, ceoBasic.last_name, '— enriching for email');
+        const enriched = await apollo.enrichPersonByNameAndDomain(
+          ceoBasic.first_name, ceoBasic.last_name, domain, apiKey
+        );
+        results.ceo = enriched || ceoBasic;
       } else {
-        console.log('[Step 3] No org chart root ID, falling back to people search');
-        const ceoBasic = await apollo.findCEO(domain, apiKey);
-        if (ceoBasic?.id) {
-          results.ceo = await apollo.enrichPersonById(ceoBasic.id, apiKey) || ceoBasic;
-        } else {
-          results.ceo = ceoBasic;
-        }
+        results.ceo = ceoBasic;
       }
       console.log('[Step 3] Done');
     } catch (e) {
