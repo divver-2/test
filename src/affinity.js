@@ -254,6 +254,32 @@ async function markConnected({ priorityFieldValueId, connectedOptionId }, apiKey
   return updateFieldValue(priorityFieldValueId, connectedOptionId, apiKey);
 }
 
+// ── Set global owner on an organization ───────────────────────────────────────
+
+async function setGlobalOwner(orgId, ownerName, apiKey) {
+  const client = getClient(apiKey);
+  let globalFields = [];
+  try {
+    const res = await client.get('/fields', { params: { value_type: 0 } });
+    globalFields = Array.isArray(res.data) ? res.data : [];
+  } catch { return false; }
+
+  const ownerField = globalFields.find(f =>
+    f.name?.toLowerCase() === 'owner' ||
+    f.name?.toLowerCase().includes('global owner') ||
+    f.name?.toLowerCase().includes('owner')
+  );
+  if (!ownerField) return false;
+
+  const user = await findUserByName(ownerName, apiKey);
+  if (!user) return false;
+
+  try {
+    await setFieldValue({ fieldId: ownerField.id, entityId: orgId, listEntryId: null, value: user.id }, apiKey);
+    return `${user.first_name || ''} ${user.last_name || ''}`.trim();
+  } catch { return false; }
+}
+
 // ── Lookup company: owner + email history (read-only) ─────────────────────────
 
 async function lookupCompanyInAffinity(companyName, apiKey) {
@@ -325,4 +351,5 @@ module.exports = {
   addToSourcingList,
   markConnected,
   lookupCompanyInAffinity,
+  setGlobalOwner,
 };

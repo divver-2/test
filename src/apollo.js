@@ -35,8 +35,13 @@ async function findCEO(domain, apiKey) {
     `${APOLLO_BASE}/mixed_people/search`,
     {
       q_organization_domains: domain,
-      person_titles: ['CEO', 'Chief Executive Officer', 'Founder & CEO', 'Co-Founder & CEO'],
+      person_titles: [
+        'CEO', 'Chief Executive Officer', 'Founder & CEO', 'Co-Founder & CEO',
+        'Founder and CEO', 'Co-founder and CEO', 'Founder', 'Co-Founder',
+        'Managing Director', 'President', 'Owner', 'Founder/CEO',
+      ],
       per_page: 1,
+      reveal_personal_emails: true,
     },
     { headers: getHeaders(apiKey) }
   );

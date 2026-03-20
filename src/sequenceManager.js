@@ -245,11 +245,23 @@ async function runOutreachByCompany({ companyName, apiKey }) {
     : null;
   const ceoEmail = results.ceo?.email || results.ceo?.personal_emails?.[0] || null;
 
-  // 4. Lookup in Affinity (read-only: owner + emails)
+  // 4. Generate proposed email
+  const emailSequence = buildEmailSequence({
+    ceoName,
+    companyName: orgName,
+    industry: results.organization?.industry || '',
+    senderName: 'David Divver',
+  });
+
+  // 5. Lookup in Affinity + set global owner to David Divver
   const affinityKey = process.env.AFFINITY_API_KEY;
   if (affinityKey) {
     try {
       results.affinityData = await affinity.lookupCompanyInAffinity(orgName, affinityKey);
+      if (results.affinityData?.orgId) {
+        const ownerSet = await affinity.setGlobalOwner(results.affinityData.orgId, 'David Divver', affinityKey);
+        if (ownerSet) results.affinityData.owner = ownerSet;
+      }
     } catch (e) {
       results.errors.push(`Affinity lookup failed: ${e.message}`);
     }
@@ -280,6 +292,7 @@ async function runOutreachByCompany({ companyName, apiKey }) {
       emailsSent: results.affinityData.emailsSent,
       lastEmailDate: results.affinityData.lastEmailDate,
     } : { inAffinity: false, owner: null, emailsSent: 0, lastEmailDate: null },
+    emailDraft: emailSequence[0] || null,
     errors: results.errors,
   };
 }

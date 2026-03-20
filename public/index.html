@@ -249,6 +249,42 @@
     }
     .empty span { display: block; font-size: 1.6rem; margin-bottom: 10px; opacity: 0.5; }
 
+    /* ── Email draft ── */
+    .email-draft {
+      border-top: 1px solid var(--border);
+      padding: 22px 24px;
+    }
+    .draft-subject {
+      display: flex; align-items: center; gap: 8px;
+      background: var(--surface2); border: 1px solid var(--border);
+      border-radius: 8px; padding: 10px 13px; margin-bottom: 10px;
+      font-size: 0.875rem;
+    }
+    .draft-label { color: var(--muted); font-size: 0.75rem; font-weight: 600; flex-shrink: 0; }
+    .draft-body {
+      width: 100%; background: var(--surface2); border: 1px solid var(--border);
+      border-radius: 8px; padding: 12px 13px; color: var(--text);
+      font-size: 0.875rem; line-height: 1.6; resize: vertical;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      outline: none; min-height: 180px;
+    }
+    .draft-body:focus { border-color: var(--accent); }
+    .draft-actions { display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap; }
+    .btn-copy {
+      padding: 8px 18px; border-radius: 8px; border: none; cursor: pointer;
+      font-size: 0.85rem; font-weight: 600; background: var(--accent); color: #fff;
+      transition: all 0.15s;
+    }
+    .btn-copy:hover { background: var(--accent-hover); }
+    .btn-mailto {
+      padding: 8px 18px; border-radius: 8px; cursor: pointer;
+      font-size: 0.85rem; font-weight: 600;
+      background: var(--surface2); border: 1px solid var(--border); color: var(--text);
+      text-decoration: none; display: inline-flex; align-items: center;
+      transition: all 0.15s;
+    }
+    .btn-mailto:hover { border-color: var(--accent); color: var(--accent-hover); }
+
     .hidden { display: none !important; }
 
     @media (max-width: 620px) {
@@ -281,7 +317,7 @@
         <label>Company Name</label>
         <input type="text" id="companyInput" placeholder="e.g. Stripe, Vendelux, HubSpot…" autocomplete="off" />
       </div>
-      <button class="btn btn-primary" id="addBtn" onclick="addCompany()">Add Company</button>
+      <button class="btn btn-primary" id="addBtn" onclick="addCompany()">Email Company</button>
     </div>
   </div>
 
@@ -325,6 +361,20 @@
 
     <!-- Footer -->
     <div class="result-footer" id="resultFooter"></div>
+
+    <!-- Email draft -->
+    <div class="email-draft" id="emailDraftSection">
+      <div class="col-label" style="margin-bottom:12px">Proposed Email</div>
+      <div class="draft-subject">
+        <span class="draft-label">Subject:</span>
+        <span id="draftSubject" style="flex:1"></span>
+      </div>
+      <textarea class="draft-body" id="draftBody"></textarea>
+      <div class="draft-actions">
+        <button class="btn-copy" onclick="copyEmail()">Copy Email</button>
+        <a class="btn-mailto" id="mailtoLink" href="#">Open in Email App</a>
+      </div>
+    </div>
   </div>
 
   <!-- History table -->
@@ -440,6 +490,18 @@ async function addCompany() {
   }
 }
 
+// ── Copy email to clipboard ───────────────────────────────
+function copyEmail() {
+  const subject = document.getElementById('draftSubject').textContent;
+  const body = document.getElementById('draftBody').value;
+  const text = `Subject: ${subject}\n\n${body}`;
+  navigator.clipboard.writeText(text).then(() => {
+    const btn = document.querySelector('.btn-copy');
+    btn.textContent = 'Copied!';
+    setTimeout(() => btn.textContent = 'Copy Email', 2000);
+  });
+}
+
 // ── Render result card ────────────────────────────────────
 function renderResult(data) {
   const { company, ceo, apollo } = data;
@@ -483,8 +545,22 @@ function renderResult(data) {
     badge.className = 'badge badge-gray'; badge.textContent = 'not found';
   }
 
+  // Email draft
+  if (data.emailDraft) {
+    document.getElementById('draftSubject').textContent = data.emailDraft.subject || '';
+    document.getElementById('draftBody').value = data.emailDraft.body || '';
+    const mailto = `mailto:${esc(ceo?.email || '')}?subject=${encodeURIComponent(data.emailDraft.subject || '')}&body=${encodeURIComponent(data.emailDraft.body || '')}`;
+    document.getElementById('mailtoLink').href = mailto;
+    document.getElementById('emailDraftSection').style.display = '';
+  } else {
+    document.getElementById('emailDraftSection').style.display = 'none';
+  }
+
   // Footer
   const { affinity } = data;
+  const lastEmailStr = affinity?.lastEmailDate
+    ? `Last sent ${fmtDate(affinity.lastEmailDate)}`
+    : 'No emails sent yet';
   const items = [
     {
       ok: affinity?.inAffinity,
@@ -492,14 +568,12 @@ function renderResult(data) {
     },
     {
       ok: !!affinity?.owner,
-      text: affinity?.owner
-        ? `<strong>Owner</strong>: ${esc(affinity.owner)}`
-        : 'No owner set in Affinity',
+      text: affinity?.owner ? `<strong>Owner</strong>: ${esc(affinity.owner)}` : 'No owner set in Affinity',
     },
     {
       ok: affinity?.emailsSent > 0,
       text: affinity?.emailsSent > 0
-        ? `<strong>${affinity.emailsSent}</strong> email${affinity.emailsSent === 1 ? '' : 's'} sent`
+        ? `<strong>${affinity.emailsSent}</strong> email${affinity.emailsSent === 1 ? '' : 's'} sent · ${lastEmailStr}`
         : 'No emails sent yet',
     },
   ];
