@@ -14,18 +14,15 @@ app.use(express.static(path.join(__dirname, 'public')));
 
 // Preview endpoint — enriches data and generates emails without touching Apollo sequences
 app.post('/api/preview', async (req, res) => {
-  const { email, senderName, apiKey } = req.body;
+  const { email, senderName } = req.body;
   if (!email) return res.status(400).json({ error: 'email is required' });
-
-  const usedApiKey = apiKey || process.env.APOLLO_API_KEY;
-  if (!usedApiKey) return res.status(400).json({ error: 'Apollo API key is required' });
 
   try {
     const domain = email.split('@')[1];
     const [contact, org, ceo] = await Promise.allSettled([
-      apollo.enrichContact(email, usedApiKey),
-      apollo.enrichOrganization(domain, usedApiKey),
-      apollo.findCEO(domain, usedApiKey),
+      apollo.enrichContact(email),
+      apollo.enrichOrganization(domain),
+      apollo.findCEO(domain),
     ]);
 
     const organization = org.status === 'fulfilled' ? org.value : null;
@@ -73,14 +70,11 @@ app.post('/api/preview', async (req, res) => {
 
 // Company lookup endpoint — enrich by name, find CEO, lookup Affinity
 app.post('/api/company', async (req, res) => {
-  const { companyName, apiKey: bodyKey } = req.body;
+  const { companyName } = req.body;
   if (!companyName) return res.status(400).json({ error: 'companyName is required' });
 
-  const apiKey = bodyKey || process.env.APOLLO_API_KEY;
-  if (!apiKey) return res.status(400).json({ error: 'Apollo API key is required — enter it in Settings' });
-
   try {
-    const result = await runOutreachByCompany({ companyName, apiKey });
+    const result = await runOutreachByCompany({ companyName });
     res.json(result);
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -89,17 +83,13 @@ app.post('/api/company', async (req, res) => {
 
 // Launch endpoint — runs the full sequence: enrich, upsert CRM, create Apollo sequence
 app.post('/api/launch', async (req, res) => {
-  const { email, senderName, apiKey } = req.body;
+  const { email, senderName } = req.body;
   if (!email) return res.status(400).json({ error: 'email is required' });
-
-  const usedApiKey = apiKey || process.env.APOLLO_API_KEY;
-  if (!usedApiKey) return res.status(400).json({ error: 'Apollo API key is required' });
 
   try {
     const result = await runOutreachSequence({
       email,
       senderName: senderName || 'Your Name',
-      apiKey: usedApiKey,
     });
     res.json(result);
   } catch (err) {

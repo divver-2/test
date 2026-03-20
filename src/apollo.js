@@ -1,36 +1,31 @@
 const axios = require('axios');
 
-const APOLLO_BASE = 'https://api.apollo.io/api/v1';
+// Points to the local MCP proxy instead of api.apollo.io directly
+const APOLLO_BASE = 'http://localhost:3001/v1';
 
-function getHeaders(apiKey) {
-  return {
-    'Content-Type': 'application/json',
-    'X-Api-Key': apiKey,
-  };
+function getHeaders() {
+  return { 'Content-Type': 'application/json' };
 }
 
-// Look up a person by email and enrich their data + company
-async function enrichContact(email, apiKey) {
+async function enrichContact(email) {
   const res = await axios.post(
     `${APOLLO_BASE}/people/match`,
     { email, reveal_personal_emails: true },
-    { headers: getHeaders(apiKey) }
+    { headers: getHeaders() }
   );
   return res.data.person || null;
 }
 
-// Enrich the organization to find the CEO
-async function enrichOrganization(domain, apiKey) {
+async function enrichOrganization(domain) {
   const res = await axios.post(
     `${APOLLO_BASE}/organizations/enrich`,
     { domain },
-    { headers: getHeaders(apiKey) }
+    { headers: getHeaders() }
   );
   return res.data.organization || null;
 }
 
-// Find the CEO of a company by domain
-async function findCEO(domain, apiKey) {
+async function findCEO(domain) {
   const res = await axios.post(
     `${APOLLO_BASE}/mixed_people/search`,
     {
@@ -41,122 +36,89 @@ async function findCEO(domain, apiKey) {
         'Managing Director', 'President', 'Owner'],
       per_page: 5,
     },
-    { headers: getHeaders(apiKey) }
+    { headers: getHeaders() }
   );
   const people = res.data.people || [];
-  // Prefer someone with CEO/Founder in title, else take first c_suite result
   const ceo = people.find(p => /ceo|chief executive|founder/i.test(p.title || '')) || people[0] || null;
   console.log('[Apollo] findCEO result:', ceo ? { id: ceo.id, name: `${ceo.first_name} ${ceo.last_name}`, title: ceo.title } : 'null');
   return ceo;
 }
 
-// Search or create a contact in Apollo CRM
-async function upsertContact(contactData, apiKey) {
-  // Try to find existing contact first
+async function upsertContact(contactData) {
   const searchRes = await axios.post(
     `${APOLLO_BASE}/contacts/search`,
     { q_keywords: contactData.email, per_page: 1 },
-    { headers: getHeaders(apiKey) }
+    { headers: getHeaders() }
   );
   const existing = (searchRes.data.contacts || [])[0];
   if (existing) return { contact: existing, created: false };
 
-  // Create new contact
   const createRes = await axios.post(
     `${APOLLO_BASE}/contacts`,
     contactData,
-    { headers: getHeaders(apiKey) }
+    { headers: getHeaders() }
   );
   return { contact: createRes.data.contact, created: true };
 }
 
-// Search for sequences (emailer campaigns)
-async function searchSequences(name, apiKey) {
+async function searchSequences(name) {
   const res = await axios.get(
     `${APOLLO_BASE}/emailer_campaigns/search`,
-    {
-      params: { name, per_page: 10 },
-      headers: getHeaders(apiKey),
-    }
+    { params: { name, per_page: 10 }, headers: getHeaders() }
   );
   return res.data.emailer_campaigns || [];
 }
 
-// Create a new Apollo sequence with 5 follow-ups spaced 45 days apart (~1.5 months)
-async function createSequence(sequenceName, emailAccountId, apiKey) {
-  // Create the sequence (campaign)
+async function createSequence(sequenceName) {
   const campaignRes = await axios.post(
     `${APOLLO_BASE}/emailer_campaigns`,
-    {
-      name: sequenceName,
-      emailer_schedule_id: null, // uses default schedule
-      permissions: 'private',
-    },
-    { headers: getHeaders(apiKey) }
+    { name: sequenceName, permissions: 'private' },
+    { headers: getHeaders() }
   );
-  const campaign = campaignRes.data.emailer_campaign;
-  return campaign;
+  return campaignRes.data.emailer_campaign;
 }
 
-// Add a contact to a sequence
-async function addContactToSequence(sequenceId, contactId, emailAccountId, apiKey) {
-  const res = await axios.post(
-    `${APOLLO_BASE}/emailer_campaigns/${sequenceId}/add_contact_ids`,
-    {
-      contact_ids: [contactId],
-      emailer_campaign_id: sequenceId,
-      send_email_from_email_account_id: emailAccountId,
-    },
-    { headers: getHeaders(apiKey) }
-  );
-  return res.data;
+async function addContactToSequence(sequenceId, contactId) {
+  // stub — sequences managed directly in Apollo UI
+  return {};
 }
 
-// Search for a company by name
-async function searchCompanyByName(name, apiKey) {
+async function searchCompanyByName(name) {
   const res = await axios.post(
     `${APOLLO_BASE}/mixed_companies/search`,
     { q_organization_name: name, per_page: 1 },
-    { headers: getHeaders(apiKey) }
+    { headers: getHeaders() }
   );
   return (res.data.organizations || [])[0] || null;
 }
 
-// Enrich a person by their Apollo ID to get email
-async function enrichPersonById(apolloId, apiKey) {
+async function enrichPersonById(apolloId) {
   const res = await axios.post(
     `${APOLLO_BASE}/people/match`,
     { id: apolloId, reveal_personal_emails: true },
-    { headers: getHeaders(apiKey) }
+    { headers: getHeaders() }
   );
   return res.data.person || null;
 }
 
-// Enrich a person by name + domain (works on free plan, consumes 1 email credit)
-// Pass apolloId (from search result) for best match accuracy — free plan obfuscates last names
-async function enrichPersonByNameAndDomain(firstName, lastName, domain, apiKey, apolloId = null, orgName = null) {
+async function enrichPersonByNameAndDomain(firstName, lastName, domain, _apiKey, apolloId = null, orgName = null) {
   const payload = { first_name: firstName, domain, reveal_personal_emails: true };
   if (orgName) payload.organization_name = orgName;
   if (apolloId) payload.id = apolloId;
   const res = await axios.post(
     `${APOLLO_BASE}/people/match`,
     payload,
-    { headers: getHeaders(apiKey) }
+    { headers: getHeaders() }
   );
   return res.data.person || null;
 }
 
-// Get connected email accounts
-async function getEmailAccounts(apiKey) {
-  const res = await axios.get(
-    `${APOLLO_BASE}/email_accounts`,
-    { headers: getHeaders(apiKey) }
-  );
+async function getEmailAccounts() {
+  const res = await axios.get(`${APOLLO_BASE}/email_accounts`, { headers: getHeaders() });
   return res.data.email_accounts || [];
 }
 
-// Create an account (company) in Apollo CRM if it doesn't exist
-async function upsertAccount(orgData, apiKey) {
+async function upsertAccount(orgData) {
   const res = await axios.post(
     `${APOLLO_BASE}/accounts`,
     {
@@ -166,7 +128,7 @@ async function upsertAccount(orgData, apiKey) {
       industry: orgData.industry,
       employee_count: orgData.num_employees,
     },
-    { headers: getHeaders(apiKey) }
+    { headers: getHeaders() }
   );
   return res.data.account;
 }

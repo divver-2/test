@@ -5,7 +5,7 @@ const { buildEmailSequence, FOLLOWUP_DELAY_DAYS } = require('./emailGenerator');
 const SEQUENCE_NAME_PREFIX = 'CEO Outreach —';
 
 // Main orchestration: look up contact, generate emails, create sequence in Apollo CRM
-async function runOutreachSequence({ email, senderName, apiKey }) {
+async function runOutreachSequence({ email, senderName }) {
   const results = {
     contact: null,
     ceo: null,
@@ -22,7 +22,7 @@ async function runOutreachSequence({ email, senderName, apiKey }) {
 
   // 1. Enrich the contact from the provided email
   try {
-    results.contact = await apollo.enrichContact(email, apiKey);
+    results.contact = await apollo.enrichContact(email);
   } catch (e) {
     results.errors.push(`Contact enrichment failed: ${e.message}`);
   }
@@ -36,7 +36,7 @@ async function runOutreachSequence({ email, senderName, apiKey }) {
 
   // 3. Enrich organization data
   try {
-    results.organization = await apollo.enrichOrganization(domain, apiKey);
+    results.organization = await apollo.enrichOrganization(domain);
   } catch (e) {
     results.errors.push(`Organization enrichment failed: ${e.message}`);
   }
@@ -46,7 +46,7 @@ async function runOutreachSequence({ email, senderName, apiKey }) {
 
   // 4. Find the CEO
   try {
-    results.ceo = await apollo.findCEO(domain, apiKey);
+    results.ceo = await apollo.findCEO(domain);
   } catch (e) {
     results.errors.push(`CEO lookup failed: ${e.message}`);
   }
@@ -67,7 +67,7 @@ async function runOutreachSequence({ email, senderName, apiKey }) {
   // 6. Upsert account in Apollo CRM
   if (results.organization) {
     try {
-      results.crmAccount = await apollo.upsertAccount(results.organization, apiKey);
+      results.crmAccount = await apollo.upsertAccount(results.organization);
     } catch (e) {
       results.errors.push(`CRM account creation failed: ${e.message}`);
     }
@@ -84,7 +84,7 @@ async function runOutreachSequence({ email, senderName, apiKey }) {
         organization_name: orgName,
         account_id: results.crmAccount?.id,
       };
-      const { contact, created } = await apollo.upsertContact(contactPayload, apiKey);
+      const { contact, created } = await apollo.upsertContact(contactPayload);
       results.crmContact = { ...contact, wasCreated: created };
     } catch (e) {
       results.errors.push(`CRM contact creation failed: ${e.message}`);
@@ -114,7 +114,6 @@ async function runOutreachSequence({ email, senderName, apiKey }) {
         results.affinityPerson = { ...person, wasCreated: personCreated };
       }
 
-      // Add to sourcing list, set global owner + priority = Chasing
       results.affinityList = await affinity.addToSourcingList(
         { orgId: org.id, senderName },
         affinityKey
@@ -127,34 +126,14 @@ async function runOutreachSequence({ email, senderName, apiKey }) {
   // 9. Find or create the Apollo sequence
   try {
     const sequenceName = `${SEQUENCE_NAME_PREFIX} ${orgName}`;
-    const existing = await apollo.searchSequences(sequenceName, apiKey);
+    const existing = await apollo.searchSequences(sequenceName);
     if (existing.length > 0) {
       results.apolloSequence = { ...existing[0], alreadyExisted: true };
     } else {
-      const emailAccounts = await apollo.getEmailAccounts(apiKey);
-      const emailAccountId = emailAccounts[0]?.id || null;
-      results.apolloSequence = await apollo.createSequence(sequenceName, emailAccountId, apiKey);
+      results.apolloSequence = await apollo.createSequence(sequenceName);
     }
   } catch (e) {
     results.errors.push(`Sequence creation failed: ${e.message}`);
-  }
-
-  // 10. Add CEO contact to the sequence
-  if (results.apolloSequence && results.crmContact) {
-    try {
-      const emailAccounts = await apollo.getEmailAccounts(apiKey);
-      const emailAccountId = emailAccounts[0]?.id || null;
-      await apollo.addContactToSequence(
-        results.apolloSequence.id,
-        results.crmContact.id,
-        emailAccountId,
-        apiKey
-      );
-      results.apolloSequence.contactAdded = true;
-    } catch (e) {
-      results.errors.push(`Adding contact to sequence failed: ${e.message}`);
-      results.apolloSequence.contactAdded = false;
-    }
   }
 
   return {
@@ -176,7 +155,6 @@ async function runOutreachSequence({ email, senderName, apiKey }) {
       sequenceId: results.apolloSequence?.id,
       sequenceName: results.apolloSequence?.name,
       sequenceAlreadyExisted: results.apolloSequence?.alreadyExisted || false,
-      contactAdded: results.apolloSequence?.contactAdded || false,
       crmContactId: results.crmContact?.id,
       crmAccountId: results.crmAccount?.id,
     },
@@ -198,30 +176,24 @@ async function runOutreachSequence({ email, senderName, apiKey }) {
   };
 }
 
-// Enrich company by name: get CEO + company info from Apollo, owner + emails from Affinity
-async function runOutreachByCompany({ companyName, apiKey }) {
+// Enrich company by domain: get CEO + company info via MCP proxy, owner + emails from Affinity
+async function runOutreachByCompany({ companyName }) {
   const results = { organization: null, ceo: null, affinityData: null, errors: [] };
 
-  // 1. Search for company to get domain
-  // If input looks like a domain (has a dot, no spaces), use it directly
   const looksLikeDomain = companyName.includes('.') && !companyName.includes(' ');
   let domain = looksLikeDomain ? companyName.toLowerCase() : null;
 
-  if (looksLikeDomain) {
-    console.log('[Step 1] Input looks like domain, using directly:', domain);
-  } else {
+  if (!looksLikeDomain) {
     try {
       console.log('[Step 1] Searching company:', companyName);
-      const found = await apollo.searchCompanyByName(companyName, apiKey);
+      const found = await apollo.searchCompanyByName(companyName);
       if (found) {
         results.organization = found;
         domain = found.primary_domain || found.domain;
         console.log('[Step 1] Found:', found.name, '| domain:', domain);
-      } else {
-        console.log('[Step 1] No company found');
       }
     } catch (e) {
-      console.error('[Step 1] FAILED:', e.message, e.response?.data);
+      console.error('[Step 1] FAILED:', e.message);
       results.errors.push(`Company search failed: ${e.message}`);
     }
   }
@@ -230,52 +202,46 @@ async function runOutreachByCompany({ companyName, apiKey }) {
   if (domain) {
     try {
       console.log('[Step 2] Enriching org for domain:', domain);
-      const enriched = await apollo.enrichOrganization(domain, apiKey);
+      const enriched = await apollo.enrichOrganization(domain);
       if (enriched) results.organization = enriched;
-      console.log('[Step 2] Done');
     } catch (e) {
-      console.error('[Step 2] FAILED:', e.message, e.response?.data);
+      console.error('[Step 2] FAILED:', e.message);
       results.errors.push(`Organization enrichment failed: ${e.message}`);
     }
   }
 
   const orgName = results.organization?.name || companyName;
 
-  // 3. Find CEO by domain, then enrich by name+domain for email (free-plan compatible)
+  // 3. Find CEO by domain, then enrich for email
   if (domain) {
     try {
       console.log('[Step 3] Finding CEO for domain:', domain);
-      const ceoBasic = await apollo.findCEO(domain, apiKey);
+      const ceoBasic = await apollo.findCEO(domain);
       if (ceoBasic?.first_name) {
         console.log('[Step 3] CEO found:', ceoBasic.first_name, ceoBasic.last_name, '— enriching for email');
         const enriched = await apollo.enrichPersonByNameAndDomain(
-          ceoBasic.first_name, ceoBasic.last_name, domain, apiKey, ceoBasic.id, orgName
+          ceoBasic.first_name, ceoBasic.last_name, domain, null, ceoBasic.id, orgName
         );
         results.ceo = enriched || ceoBasic;
       } else {
         results.ceo = ceoBasic;
       }
-      console.log('[Step 3] Done');
     } catch (e) {
-      console.error('[Step 3] FAILED:', e.message, e.response?.data);
+      console.error('[Step 3] FAILED:', e.message);
       results.errors.push(`CEO lookup failed: ${e.message}`);
     }
   }
 
-  // Debug: log raw CEO fields so we can see what Apollo returns
   if (results.ceo) {
     console.log('[CEO raw]', JSON.stringify({
       id: results.ceo.id,
       name: `${results.ceo.first_name} ${results.ceo.last_name}`,
       title: results.ceo.title,
       email: results.ceo.email,
-      work_email: results.ceo.work_email,
+      linkedin_url: results.ceo.linkedin_url,
       personal_emails: results.ceo.personal_emails,
-      contact_emails: results.ceo.contact_emails,
       email_status: results.ceo.email_status,
     }, null, 2));
-  } else {
-    console.log('[CEO raw] null — no CEO found for domain:', domain);
   }
 
   const ceoName = results.ceo
@@ -296,7 +262,7 @@ async function runOutreachByCompany({ companyName, apiKey }) {
     senderName: 'David Divver',
   });
 
-  // 5. Lookup in Affinity + set global owner to David Divver
+  // 5. Lookup in Affinity + set global owner
   const affinityKey = process.env.AFFINITY_API_KEY;
   if (affinityKey) {
     try {
