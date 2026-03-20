@@ -234,16 +234,22 @@ async function runOutreachByCompany({ companyName, apiKey }) {
 
   const orgName = results.organization?.name || companyName;
 
-  // 3. Find CEO and enrich for verified email
+  // 3. Find CEO using org_chart_root_people_ids from enriched org (free-plan compatible)
   if (domain) {
     try {
       console.log('[Step 3] Finding CEO for domain:', domain);
-      const ceoBasic = await apollo.findCEO(domain, apiKey);
-      if (ceoBasic?.id) {
-        console.log('[Step 3] CEO found, enriching by ID:', ceoBasic.id);
-        results.ceo = await apollo.enrichPersonById(ceoBasic.id, apiKey) || ceoBasic;
+      const rootId = results.organization?.org_chart_root_people_ids?.[0];
+      if (rootId) {
+        console.log('[Step 3] CEO ID from org chart:', rootId);
+        results.ceo = await apollo.enrichPersonById(rootId, apiKey);
       } else {
-        results.ceo = ceoBasic;
+        console.log('[Step 3] No org chart root ID, falling back to people search');
+        const ceoBasic = await apollo.findCEO(domain, apiKey);
+        if (ceoBasic?.id) {
+          results.ceo = await apollo.enrichPersonById(ceoBasic.id, apiKey) || ceoBasic;
+        } else {
+          results.ceo = ceoBasic;
+        }
       }
       console.log('[Step 3] Done');
     } catch (e) {
