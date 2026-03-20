@@ -73,11 +73,11 @@ app.post('/api/preview', async (req, res) => {
 
 // Company lookup endpoint — enrich by name, find CEO, lookup Affinity
 app.post('/api/company', async (req, res) => {
-  const { companyName } = req.body;
+  const { companyName, apiKey: bodyKey } = req.body;
   if (!companyName) return res.status(400).json({ error: 'companyName is required' });
 
-  const apiKey = process.env.APOLLO_API_KEY;
-  if (!apiKey) return res.status(400).json({ error: 'Apollo API key is required' });
+  const apiKey = bodyKey || process.env.APOLLO_API_KEY;
+  if (!apiKey) return res.status(400).json({ error: 'Apollo API key is required — enter it in Settings' });
 
   try {
     const result = await runOutreachByCompany({ companyName, apiKey });

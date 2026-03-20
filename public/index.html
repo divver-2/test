@@ -249,6 +249,25 @@
     }
     .empty span { display: block; font-size: 1.6rem; margin-bottom: 10px; opacity: 0.5; }
 
+    /* ── Settings ── */
+    .btn-gear {
+      background: none; border: 1px solid var(--border); color: var(--muted);
+      border-radius: 8px; padding: 6px 10px; cursor: pointer; font-size: 1rem;
+      transition: all 0.15s;
+    }
+    .btn-gear:hover { border-color: var(--accent); color: var(--accent-hover); }
+    .settings-panel {
+      background: var(--surface); border-bottom: 1px solid var(--border);
+      padding: 0; max-height: 0; overflow: hidden; transition: max-height 0.25s ease, padding 0.25s;
+    }
+    .settings-panel.open {
+      max-height: 260px; padding: 20px 0;
+    }
+    .settings-inner {
+      max-width: 640px; margin: 0 auto; padding: 0 28px;
+    }
+    .settings-title { font-weight: 700; font-size: 0.95rem; margin-bottom: 14px; }
+
     /* ── Email draft ── */
     .email-draft {
       border-top: 1px solid var(--border);
@@ -302,9 +321,26 @@
     <h1>Outreach Hub</h1>
     <p>Type a company name — we'll find the CEO, enrich the data, and add them to Apollo automatically.</p>
   </div>
-  <div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end">
-    <div class="apollo-pill"><div class="pulse"></div> Apollo Connected</div>
-    <div class="apollo-pill" style="background:rgba(16,185,129,0.1);border-color:rgba(16,185,129,0.22);color:#6ee7b7"><div class="pulse"></div> Affinity Connected</div>
+  <div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end;align-items:center">
+    <div class="apollo-pill" id="apolloPill"><div class="pulse"></div> Apollo</div>
+    <div class="apollo-pill" style="background:rgba(16,185,129,0.1);border-color:rgba(16,185,129,0.22);color:#6ee7b7"><div class="pulse"></div> Affinity</div>
+    <button class="btn-gear" onclick="toggleSettings()" title="Settings">⚙</button>
+  </div>
+</div>
+
+<!-- Settings panel -->
+<div class="settings-panel hidden" id="settingsPanel">
+  <div class="settings-inner">
+    <div class="settings-title">Settings</div>
+    <div class="field">
+      <label>Apollo API Key</label>
+      <input type="password" id="apolloKeyInput" placeholder="Paste your Apollo API key…" autocomplete="off" />
+    </div>
+    <div style="display:flex;gap:8px;margin-top:12px">
+      <button class="btn btn-primary" onclick="saveSettings()">Save</button>
+      <button class="btn" onclick="toggleSettings()">Cancel</button>
+    </div>
+    <div style="font-size:0.77rem;color:var(--muted);margin-top:10px">Key is stored in your browser only, never sent to any server except Apollo.</div>
   </div>
 </div>
 
@@ -446,6 +482,12 @@ async function addCompany() {
 
   if (!companyName) { setStatus('Please enter a company name.', 'error'); return; }
 
+  const apiKey = getApiKey();
+  if (!apiKey) {
+    setStatus('Please enter your Apollo API key in Settings (⚙ top right).', 'error');
+    return;
+  }
+
   document.getElementById('resultCard').classList.add('hidden');
   setStatus(`Looking up <strong>${esc(companyName)}</strong>…`, 'loading');
   document.getElementById('addBtn').disabled = true;
@@ -454,7 +496,7 @@ async function addCompany() {
     const res = await fetch('/api/company', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ companyName }),
+      body: JSON.stringify({ companyName, apiKey }),
     });
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || 'Lookup failed');
@@ -489,6 +531,49 @@ async function addCompany() {
     document.getElementById('addBtn').disabled = false;
   }
 }
+
+// ── Settings / API key ────────────────────────────────────
+function getApiKey() { return localStorage.getItem('apollo_api_key') || ''; }
+
+function toggleSettings() {
+  const panel = document.getElementById('settingsPanel');
+  panel.classList.toggle('open');
+  if (panel.classList.contains('open')) {
+    document.getElementById('apolloKeyInput').value = getApiKey();
+    setTimeout(() => document.getElementById('apolloKeyInput').focus(), 50);
+  }
+}
+
+function saveSettings() {
+  const key = document.getElementById('apolloKeyInput').value.trim();
+  if (key) {
+    localStorage.setItem('apollo_api_key', key);
+    updatePill(true);
+  } else {
+    localStorage.removeItem('apollo_api_key');
+    updatePill(false);
+  }
+  document.getElementById('settingsPanel').classList.remove('open');
+  setStatus(key ? 'Apollo API key saved.' : 'Apollo API key cleared.', key ? 'success' : 'error');
+}
+
+function updatePill(hasKey) {
+  const pill = document.getElementById('apolloPill');
+  if (hasKey) {
+    pill.style.background = 'rgba(99,102,241,0.1)';
+    pill.style.borderColor = 'rgba(99,102,241,0.22)';
+    pill.style.color = '#a5b4fc';
+    pill.innerHTML = '<div class="pulse"></div> Apollo Connected';
+  } else {
+    pill.style.background = 'rgba(239,68,68,0.1)';
+    pill.style.borderColor = 'rgba(239,68,68,0.22)';
+    pill.style.color = '#fca5a5';
+    pill.innerHTML = '⚠ Apollo Key Missing';
+  }
+}
+
+// Init pill on load
+updatePill(!!getApiKey());
 
 // ── Copy email to clipboard ───────────────────────────────
 function copyEmail() {
