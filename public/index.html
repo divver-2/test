@@ -458,7 +458,12 @@ function fmtNum(n) {
 }
 function fmtDate(iso) {
   if (!iso) return '';
-  return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  const d = new Date(iso);
+  if (isNaN(d)) return '';
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  const yr = String(d.getFullYear()).slice(2);
+  return `${m}/${day}/${yr}`;
 }
 function firstSentences(text, n) {
   const m = (text || '').match(/[^.!?]+[.!?]+/g) || [];
@@ -663,7 +668,7 @@ function renderResult(data) {
     {
       ok: affinity?.emailsSent > 0,
       text: affinity?.emailsSent > 0
-        ? `<strong>${affinity.emailsSent}</strong> email${affinity.emailsSent === 1 ? '' : 's'} sent · ${lastEmailStr}`
+        ? `<strong>${affinity.emailsSent}</strong> email${affinity.emailsSent === 1 ? '' : 's'} sent · <strong>Last:</strong> ${fmtDate(affinity.lastEmailDate)}`
         : 'No emails sent yet',
     },
   ];

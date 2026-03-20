@@ -240,10 +240,31 @@ async function runOutreachByCompany({ companyName, apiKey }) {
     }
   }
 
+  // Debug: log raw CEO fields so we can see what Apollo returns
+  if (results.ceo) {
+    console.log('[CEO raw]', JSON.stringify({
+      id: results.ceo.id,
+      name: `${results.ceo.first_name} ${results.ceo.last_name}`,
+      title: results.ceo.title,
+      email: results.ceo.email,
+      work_email: results.ceo.work_email,
+      personal_emails: results.ceo.personal_emails,
+      contact_emails: results.ceo.contact_emails,
+      email_status: results.ceo.email_status,
+    }, null, 2));
+  } else {
+    console.log('[CEO raw] null — no CEO found for domain:', domain);
+  }
+
   const ceoName = results.ceo
     ? `${results.ceo.first_name || ''} ${results.ceo.last_name || ''}`.trim()
     : null;
-  const ceoEmail = results.ceo?.email || results.ceo?.personal_emails?.[0] || null;
+  const ceoEmail =
+    results.ceo?.email ||
+    results.ceo?.work_email ||
+    results.ceo?.personal_emails?.[0] ||
+    results.ceo?.contact_emails?.[0]?.email ||
+    null;
 
   // 4. Generate proposed email
   const emailSequence = buildEmailSequence({

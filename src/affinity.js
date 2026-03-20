@@ -319,13 +319,22 @@ async function lookupCompanyInAffinity(companyName, apiKey) {
   if (ownerField) {
     const ownerFV = fieldValues.find(fv => fv.field_id === ownerField.id);
     if (ownerFV?.value != null) {
-      try {
-        const users = await getUsers(apiKey);
-        const user = users.find(u => u.id === ownerFV.value);
-        result.owner = user
-          ? `${user.first_name || ''} ${user.last_name || ''}`.trim()
-          : String(ownerFV.value);
-      } catch { result.owner = String(ownerFV.value); }
+      const raw = ownerFV.value;
+      if (typeof raw === 'object' && raw !== null) {
+        // Affinity returned the user object directly
+        result.owner = raw.name ||
+          `${raw.first_name || ''} ${raw.last_name || ''}`.trim() ||
+          String(raw.id || raw);
+      } else {
+        // raw is a user ID — look it up
+        try {
+          const users = await getUsers(apiKey);
+          const user = users.find(u => u.id === raw);
+          result.owner = user
+            ? `${user.first_name || ''} ${user.last_name || ''}`.trim()
+            : String(raw);
+        } catch { result.owner = String(raw); }
+      }
     }
   }
 
