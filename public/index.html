@@ -281,14 +281,6 @@
         <label>Company Name</label>
         <input type="text" id="companyInput" placeholder="e.g. Stripe, Vendelux, HubSpot…" autocomplete="off" />
       </div>
-      <div class="field grow">
-        <label>Your Name</label>
-        <input type="text" id="senderName" placeholder="Alex Smith" />
-      </div>
-      <div class="field grow">
-        <label>API Key <span style="opacity:0.5;font-size:0.68rem">(optional)</span></label>
-        <input type="password" id="apiKey" placeholder="Uses .env default" />
-      </div>
       <button class="btn btn-primary" id="addBtn" onclick="addCompany()">Add Company</button>
     </div>
   </div>
@@ -350,11 +342,9 @@
             <th>Email</th>
             <th>Industry</th>
             <th>Funding</th>
-            <th>Apollo CRM</th>
-            <th>Affinity</th>
-            <th>Sequence</th>
+            <th>Affinity Owner</th>
+            <th>Emails Sent</th>
             <th>Added</th>
-            <th></th>
           </tr>
         </thead>
         <tbody id="historyBody"></tbody>
@@ -403,8 +393,6 @@ function clearStatus() {
 // ── Main action ───────────────────────────────────────────
 async function addCompany() {
   const companyName = document.getElementById('companyInput').value.trim();
-  const senderName  = document.getElementById('senderName').value.trim();
-  const apiKey      = document.getElementById('apiKey').value.trim();
 
   if (!companyName) { setStatus('Please enter a company name.', 'error'); return; }
 
@@ -416,7 +404,7 @@ async function addCompany() {
     const res = await fetch('/api/company', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ companyName, senderName, apiKey }),
+      body: JSON.stringify({ companyName }),
     });
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || 'Lookup failed');
@@ -424,25 +412,20 @@ async function addCompany() {
     renderResult(data);
 
     const entry = {
-      company:                data.company?.name || companyName,
-      domain:                 data.company?.domain,
-      logo:                   data.company?.logo,
-      ceoName:                data.ceo?.name,
-      ceoEmail:               data.ceo?.email,
-      emailVerified:          data.ceo?.emailVerified,
-      industry:               data.company?.industry,
-      funding:                data.company?.funding,
-      fundingStage:           data.company?.fundingStage,
-      crmAdded:               !!(data.apollo?.crmContactId),
-      affinityAdded:          !!(data.affinityCrm?.orgId),
-      affinityInList:         !!(data.affinityCrm?.listEntryId),
-      affinityListName:       data.affinityCrm?.listName || null,
-      affinityOwnerSet:       data.affinityCrm?.ownerSet || false,
-      priorityFieldValueId:   data.affinityCrm?.priorityFieldValueId || null,
-      connectedOptionId:      data.affinityCrm?.connectedOptionId || null,
-      affinityConnected:      false,
-      sequenceStarted:        !!(data.apollo?.contactAdded),
-      addedAt:                new Date().toISOString(),
+      company:        data.company?.name || companyName,
+      domain:         data.company?.domain,
+      logo:           data.company?.logo,
+      ceoName:        data.ceo?.name,
+      ceoEmail:       data.ceo?.email,
+      emailVerified:  data.ceo?.emailVerified,
+      industry:       data.company?.industry,
+      funding:        data.company?.funding,
+      fundingStage:   data.company?.fundingStage,
+      affinityOwner:  data.affinity?.owner || null,
+      affinityEmails: data.affinity?.emailsSent || 0,
+      affinityLastEmail: data.affinity?.lastEmailDate || null,
+      inAffinity:     data.affinity?.inAffinity || false,
+      addedAt:        new Date().toISOString(),
     };
     history.push(entry);
     localStorage.setItem('outreach_history', JSON.stringify(history));
@@ -501,31 +484,23 @@ function renderResult(data) {
   }
 
   // Footer
-  const { affinityCrm } = data;
+  const { affinity } = data;
   const items = [
     {
-      ok: !!apollo?.crmAccountId,
-      text: apollo?.crmAccountId ? '<strong>Company</strong> added to Apollo CRM' : 'Company not saved to Apollo CRM',
+      ok: affinity?.inAffinity,
+      text: affinity?.inAffinity ? '<strong>Affinity</strong>: found in CRM' : '<strong>Affinity</strong>: not in CRM',
     },
     {
-      ok: !!apollo?.crmContactId,
-      text: apollo?.crmContactId
-        ? `<strong>CEO</strong> ${apollo.crmContactNew ? 'added to' : 'already in'} Apollo CRM`
-        : 'CEO not saved to Apollo CRM',
+      ok: !!affinity?.owner,
+      text: affinity?.owner
+        ? `<strong>Owner</strong>: ${esc(affinity.owner)}`
+        : 'No owner set in Affinity',
     },
     {
-      ok: !!affinityCrm?.listEntryId,
-      text: affinityCrm?.listEntryId
-        ? `<strong>Affinity</strong>: added to ${esc(affinityCrm.listName || 'sourcing list')}${affinityCrm.ownerSet ? ' · owner set' : ''} · priority → Chasing`
-        : affinityCrm?.orgId
-          ? `<strong>Affinity</strong>: org synced (list add failed)`
-          : 'Not synced to Affinity',
-    },
-    {
-      ok: !!apollo?.contactAdded,
-      text: apollo?.contactAdded
-        ? `<strong>Sequence</strong> started`
-        : apollo?.sequenceId ? 'Sequence exists (not re-added)' : 'Sequence not started',
+      ok: affinity?.emailsSent > 0,
+      text: affinity?.emailsSent > 0
+        ? `<strong>${affinity.emailsSent}</strong> email${affinity.emailsSent === 1 ? '' : 's'} sent`
+        : 'No emails sent yet',
     },
   ];
 
@@ -551,12 +526,11 @@ function renderHistory() {
     `${history.length} compan${history.length === 1 ? 'y' : 'ies'}`;
 
   if (!history.length) {
-    tbody.innerHTML = `<tr><td colspan="10"><div class="empty"><span>🏢</span>No companies added yet.<br>Search above to get started.</div></td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="8"><div class="empty"><span>🏢</span>No companies added yet.<br>Search above to get started.</div></td></tr>`;
     return;
   }
 
-  tbody.innerHTML = history.slice().reverse().map((h, i) => {
-    const origIdx = history.length - 1 - i;
+  tbody.innerHTML = history.slice().reverse().map((h) => {
     const init = (h.company || '?')[0].toUpperCase();
     const logoHtml = h.logo
       ? `<img src="${esc(h.logo)}" onerror="this.parentElement.textContent='${init}'" />`
@@ -576,21 +550,9 @@ function renderHistory() {
         <td class="td-email">${esc(h.ceoEmail || '—')}</td>
         <td><span style="color:var(--muted);font-size:0.8rem">${esc(cap(h.industry || '—'))}</span></td>
         <td>${h.funding ? `<span class="badge badge-accent">$${esc(h.funding)}</span>` : '<span style="color:var(--muted)">—</span>'}</td>
-        <td>${h.crmAdded        ? '<span class="badge badge-green">✓ Added</span>'   : '<span class="badge badge-gray">—</span>'}</td>
-        <td>${h.affinityInList
-          ? h.affinityConnected
-            ? '<span class="badge badge-green">✓ Connected</span>'
-            : `<span class="badge badge-accent">Chasing${h.affinityOwnerSet ? ' · owned' : ''}</span>`
-          : h.affinityAdded
-            ? '<span class="badge badge-gray">Synced</span>'
-            : '<span class="badge badge-gray">—</span>'
-        }</td>
-        <td>${h.sequenceStarted ? '<span class="badge badge-green">✓ Started</span>' : '<span class="badge badge-gray">—</span>'}</td>
+        <td>${h.affinityOwner ? `<span class="badge badge-accent">${esc(h.affinityOwner)}</span>` : '<span style="color:var(--muted)">—</span>'}</td>
+        <td>${h.affinityEmails > 0 ? `<span class="badge badge-green">${h.affinityEmails} sent</span>` : '<span class="badge badge-gray">None</span>'}</td>
         <td class="td-date">${fmtDate(h.addedAt)}</td>
-        <td>${h.affinityInList && !h.affinityConnected && h.priorityFieldValueId
-          ? `<button class="btn btn-connected" onclick="markConnected(${origIdx})">Mark Connected</button>`
-          : ''
-        }</td>
       </tr>`;
   }).join('');
 }

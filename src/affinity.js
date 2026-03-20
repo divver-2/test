@@ -254,9 +254,75 @@ async function markConnected({ priorityFieldValueId, connectedOptionId }, apiKey
   return updateFieldValue(priorityFieldValueId, connectedOptionId, apiKey);
 }
 
+// ── Lookup company: owner + email history (read-only) ─────────────────────────
+
+async function lookupCompanyInAffinity(companyName, apiKey) {
+  const client = getClient(apiKey);
+
+  const org = await findOrganization(companyName, apiKey);
+  if (!org) return null;
+
+  const result = {
+    orgId: org.id,
+    orgName: org.name,
+    owner: null,
+    emailsSent: 0,
+    lastEmailDate: null,
+  };
+
+  // Get global field definitions
+  let globalFields = [];
+  try {
+    const res = await client.get('/fields', { params: { value_type: 0 } });
+    globalFields = Array.isArray(res.data) ? res.data : [];
+  } catch { /* ok */ }
+
+  // Get field values for this org
+  let fieldValues = [];
+  try {
+    const res = await client.get('/field-values', { params: { organization_id: org.id } });
+    fieldValues = Array.isArray(res.data) ? res.data : [];
+  } catch { /* ok */ }
+
+  // Resolve owner field
+  const ownerField = globalFields.find(f =>
+    f.name?.toLowerCase() === 'owner' ||
+    f.name?.toLowerCase().includes('global owner') ||
+    f.name?.toLowerCase().includes('owner')
+  );
+  if (ownerField) {
+    const ownerFV = fieldValues.find(fv => fv.field_id === ownerField.id);
+    if (ownerFV?.value != null) {
+      try {
+        const users = await getUsers(apiKey);
+        const user = users.find(u => u.id === ownerFV.value);
+        result.owner = user
+          ? `${user.first_name || ''} ${user.last_name || ''}`.trim()
+          : String(ownerFV.value);
+      } catch { result.owner = String(ownerFV.value); }
+    }
+  }
+
+  // Get email interactions
+  try {
+    const res = await client.get('/interactions', {
+      params: { organization_id: org.id },
+    });
+    const interactions = res.data?.interactions || (Array.isArray(res.data) ? res.data : []);
+    const emails = interactions.filter(i =>
+      !i.interaction_type || i.interaction_type === 'email'
+    );
+    result.emailsSent = emails.length;
+    if (emails.length > 0) result.lastEmailDate = emails[0]?.date || null;
+  } catch { /* interactions endpoint may not exist */ }
+
+  return result;
+}
+
 module.exports = {
   upsertOrganization,
   upsertPerson,
   addToSourcingList,
   markConnected,
+  lookupCompanyInAffinity,
 };

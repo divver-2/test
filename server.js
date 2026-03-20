@@ -71,20 +71,16 @@ app.post('/api/preview', async (req, res) => {
   }
 });
 
-// Company lookup endpoint — enrich by name, find CEO, auto-add to CRM and sequence
+// Company lookup endpoint — enrich by name, find CEO, lookup Affinity
 app.post('/api/company', async (req, res) => {
-  const { companyName, senderName, apiKey } = req.body;
+  const { companyName } = req.body;
   if (!companyName) return res.status(400).json({ error: 'companyName is required' });
 
-  const usedApiKey = apiKey || process.env.APOLLO_API_KEY;
-  if (!usedApiKey) return res.status(400).json({ error: 'Apollo API key is required' });
+  const apiKey = process.env.APOLLO_API_KEY;
+  if (!apiKey) return res.status(400).json({ error: 'Apollo API key is required' });
 
   try {
-    const result = await runOutreachByCompany({
-      companyName,
-      senderName: senderName || 'Your Name',
-      apiKey: usedApiKey,
-    });
+    const result = await runOutreachByCompany({ companyName, apiKey });
     res.json(result);
   } catch (err) {
     res.status(500).json({ error: err.message });
