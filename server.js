@@ -4,13 +4,34 @@ const cors = require('cors');
 const path = require('path');
 const { runOutreachSequence, runOutreachByCompany } = require('./src/sequenceManager');
 const { buildEmailSequence } = require('./src/emailGenerator');
-const apollo = require('./src/apollo');
 const affinity = require('./src/affinity');
+const { pending } = require('./src/apolloQueue');
 
 const app = express();
 app.use(cors());
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
+
+// ── Apollo MCP queue endpoints (Claude fulfills these) ────────────────────────
+
+// List pending Apollo lookups for Claude to service
+app.get('/queue', (_, res) => {
+  const items = [...pending.values()].map(({ id, type, payload, createdAt }) => ({
+    id, type, payload, createdAt,
+  }));
+  res.json(items);
+});
+
+// Claude posts the result for a queued lookup
+app.post('/fulfill/:id', (req, res) => {
+  const entry = pending.get(req.params.id);
+  if (!entry) return res.status(404).json({ error: 'not found or already fulfilled' });
+  clearTimeout(entry.timer);
+  pending.delete(req.params.id);
+  entry.resolve(req.body);
+  console.log(`[queue] fulfilled ${entry.type} ${req.params.id.slice(0, 8)}`);
+  res.json({ ok: true });
+});
 
 // Preview endpoint — enriches data and generates emails without touching Apollo sequences
 app.post('/api/preview', async (req, res) => {
