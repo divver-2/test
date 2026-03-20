@@ -113,6 +113,34 @@ app.post('/api/affinity/mark-connected', async (req, res) => {
   }
 });
 
+// Affinity check — browser calls this to get CRM status (uses server-side key)
+app.post('/api/affinity-check', async (req, res) => {
+  const { orgName } = req.body;
+  const affinityKey = process.env.AFFINITY_API_KEY;
+  if (!affinityKey || !orgName) {
+    return res.json({ inAffinity: false, owner: null, emailsSent: 0, lastEmailDate: null });
+  }
+  try {
+    const data = await affinity.lookupCompanyInAffinity(orgName, affinityKey);
+    if (data?.orgId) {
+      const owner = await affinity.setGlobalOwner(data.orgId, 'David Divver', affinityKey);
+      if (owner) data.owner = owner;
+    }
+    res.json(data
+      ? { inAffinity: true, owner: data.owner || null, emailsSent: data.emailsSent || 0, lastEmailDate: data.lastEmailDate || null }
+      : { inAffinity: false, owner: null, emailsSent: 0, lastEmailDate: null });
+  } catch (e) {
+    res.json({ inAffinity: false, owner: null, emailsSent: 0, lastEmailDate: null });
+  }
+});
+
+// Email generation — server-side so template logic stays in one place
+app.post('/api/generate-email', async (req, res) => {
+  const { ceoName, companyName, industry } = req.body;
+  const sequence = buildEmailSequence({ ceoName, companyName, industry, senderName: 'David Divver' });
+  res.json(sequence[0] || { subject: '', body: '' });
+});
+
 // Health check
 app.get('/api/health', (_, res) => res.json({ ok: true }));
 

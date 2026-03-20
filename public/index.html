@@ -496,11 +496,21 @@ function clearStatus() {
   b.className = 'status-banner'; b.innerHTML = '';
 }
 
+// ── Apollo API (called directly from browser) ─────────────
+async function apolloPost(path, body, apiKey) {
+  const res = await fetch(`https://api.apollo.io${path}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'x-api-key': apiKey },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) throw new Error(`Apollo request failed (${res.status})`);
+  return res.json();
+}
+
 // ── Main action ───────────────────────────────────────────
 async function addCompany() {
   const companyName = document.getElementById('companyInput').value.trim();
-
-  if (!companyName) { setStatus('Please enter a company name.', 'error'); return; }
+  if (!companyName) { setStatus('Please enter a company name or domain.', 'error'); return; }
 
   const apiKey = getApiKey();
   if (!apiKey) {
@@ -512,38 +522,127 @@ async function addCompany() {
   setStatus(`Looking up <strong>${esc(companyName)}</strong>…`, 'loading');
   document.getElementById('addBtn').disabled = true;
 
+  const errors = [];
+
   try {
-    const res = await fetch('/api/company', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ companyName, apiKey }),
-    });
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.error || 'Lookup failed');
+    // Step 1: resolve domain
+    const looksLikeDomain = companyName.includes('.') && !companyName.includes(' ');
+    let domain = looksLikeDomain ? companyName.toLowerCase() : null;
+    let org = null;
+
+    if (!looksLikeDomain) {
+      try {
+        const sr = await apolloPost('/v1/mixed_companies/search',
+          { q_organization_name: companyName, per_page: 1 }, apiKey);
+        org = (sr.organizations || [])[0] || null;
+        if (org) domain = org.primary_domain || org.domain || null;
+      } catch(e) { errors.push('Company search: ' + e.message); }
+    }
+
+    // Step 2: enrich org
+    if (domain) {
+      try {
+        const er = await apolloPost('/v1/organizations/enrich', { domain }, apiKey);
+        if (er.organization) org = er.organization;
+      } catch(e) { errors.push('Org enrichment: ' + e.message); }
+    }
+
+    // Step 3: find CEO
+    let ceo = null;
+    if (domain) {
+      try {
+        const cr = await apolloPost('/v1/mixed_people/search', {
+          q_organization_domains_list: [domain],
+          person_seniorities: ['c_suite'],
+          person_titles: ['CEO', 'Chief Executive Officer', 'Founder & CEO', 'Co-Founder & CEO',
+            'Founder and CEO', 'Co-founder and CEO', 'Founder', 'Co-Founder',
+            'Managing Director', 'President', 'Owner'],
+          per_page: 5,
+        }, apiKey);
+        const people = cr.people || [];
+        ceo = people.find(p => /ceo|chief executive|founder/i.test(p.title || '')) || people[0] || null;
+      } catch(e) { errors.push('CEO search: ' + e.message); }
+    }
+
+    // Step 4: enrich CEO for email
+    if (ceo?.id) {
+      try {
+        const pr = await apolloPost('/v1/people/match',
+          { id: ceo.id, reveal_personal_emails: true }, apiKey);
+        if (pr.person) ceo = pr.person;
+      } catch(e) { /* non-fatal */ }
+    }
+
+    const orgName = org?.name || companyName;
+    const ceoName = ceo ? `${ceo.first_name || ''} ${ceo.last_name || ''}`.trim() : null;
+    const ceoEmail = ceo?.email || ceo?.work_email || ceo?.personal_emails?.[0] || null;
+
+    // Step 5: Affinity via server (uses server-side key)
+    let affinityData = { inAffinity: false, owner: null, emailsSent: 0, lastEmailDate: null };
+    try {
+      const ar = await fetch('/api/affinity-check', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ orgName }),
+      });
+      if (ar.ok) affinityData = await ar.json();
+    } catch(e) { /* optional */ }
+
+    // Step 6: email draft via server
+    let emailDraft = { subject: '', body: '' };
+    try {
+      const er2 = await fetch('/api/generate-email', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ceoName, companyName: orgName, industry: org?.industry || '' }),
+      });
+      if (er2.ok) emailDraft = await er2.json();
+    } catch(e) { /* optional */ }
+
+    const data = {
+      success: errors.length === 0,
+      ceo: {
+        name: ceoName,
+        email: ceoEmail,
+        title: ceo?.title || 'Chief Executive Officer',
+        linkedinUrl: ceo?.linkedin_url || null,
+        emailVerified: ceo?.email_status === 'verified',
+      },
+      company: {
+        name: orgName,
+        domain,
+        industry: org?.industry || '',
+        employees: org?.estimated_num_employees,
+        logo: org?.logo_url,
+        description: org?.short_description,
+        funding: org?.total_funding_printed,
+        fundingStage: org?.latest_funding_stage,
+      },
+      affinity: affinityData,
+      emailDraft,
+      errors,
+    };
 
     renderResult(data);
 
-    const entry = {
-      company:        data.company?.name || companyName,
-      domain:         data.company?.domain,
-      logo:           data.company?.logo,
-      ceoName:        data.ceo?.name,
-      ceoEmail:       data.ceo?.email,
-      ceoLinkedin:    data.ceo?.linkedinUrl || null,
-      emailVerified:  data.ceo?.emailVerified,
-      industry:       data.company?.industry,
-      funding:        data.company?.funding,
-      fundingStage:   data.company?.fundingStage,
-      affinityOwner:  data.affinity?.owner || null,
-      affinityEmails: data.affinity?.emailsSent || 0,
-      affinityLastEmail: data.affinity?.lastEmailDate || null,
-      inAffinity:     data.affinity?.inAffinity || false,
+    history.push({
+      company:        data.company.name,
+      domain:         data.company.domain,
+      logo:           data.company.logo,
+      ceoName:        data.ceo.name,
+      ceoEmail:       data.ceo.email,
+      ceoLinkedin:    data.ceo.linkedinUrl,
+      emailVerified:  data.ceo.emailVerified,
+      industry:       data.company.industry,
+      funding:        data.company.funding,
+      fundingStage:   data.company.fundingStage,
+      affinityOwner:  data.affinity.owner,
+      affinityEmails: data.affinity.emailsSent,
+      inAffinity:     data.affinity.inAffinity,
       addedAt:        new Date().toISOString(),
-    };
-    history.push(entry);
+    });
     localStorage.setItem('outreach_history', JSON.stringify(history));
     renderHistory();
-
     clearStatus();
     document.getElementById('companyInput').value = '';
   } catch(e) {
