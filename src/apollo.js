@@ -35,19 +35,19 @@ async function findCEO(domain, apiKey) {
     `${APOLLO_BASE}/mixed_people/search`,
     {
       q_organization_domains_list: [domain],
-      person_titles: [
-        'CEO', 'Chief Executive Officer', 'Founder & CEO', 'Co-Founder & CEO',
+      person_seniorities: ['c_suite'],
+      person_titles: ['CEO', 'Chief Executive Officer', 'Founder & CEO', 'Co-Founder & CEO',
         'Founder and CEO', 'Co-founder and CEO', 'Founder', 'Co-Founder',
-        'Managing Director', 'President', 'Owner', 'Founder/CEO',
-      ],
-      per_page: 1,
+        'Managing Director', 'President', 'Owner'],
+      per_page: 5,
     },
     { headers: getHeaders(apiKey) }
   );
   const people = res.data.people || [];
-  const person = people[0] || null;
-  console.log('[Apollo] findCEO result:', person ? { id: person.id, name: `${person.first_name} ${person.last_name}`, title: person.title } : 'null');
-  return person;
+  // Prefer someone with CEO/Founder in title, else take first c_suite result
+  const ceo = people.find(p => /ceo|chief executive|founder/i.test(p.title || '')) || people[0] || null;
+  console.log('[Apollo] findCEO result:', ceo ? { id: ceo.id, name: `${ceo.first_name} ${ceo.last_name}`, title: ceo.title } : 'null');
+  return ceo;
 }
 
 // Search or create a contact in Apollo CRM
@@ -133,10 +133,14 @@ async function enrichPersonById(apolloId, apiKey) {
 }
 
 // Enrich a person by name + domain (works on free plan, consumes 1 email credit)
-async function enrichPersonByNameAndDomain(firstName, lastName, domain, apiKey) {
+// Pass apolloId (from search result) for best match accuracy — free plan obfuscates last names
+async function enrichPersonByNameAndDomain(firstName, lastName, domain, apiKey, apolloId = null) {
+  const payload = { first_name: firstName, domain, reveal_personal_emails: true };
+  if (lastName) payload.last_name = lastName;
+  if (apolloId) payload.id = apolloId;
   const res = await axios.post(
     `${APOLLO_BASE}/people/match`,
-    { first_name: firstName, last_name: lastName, domain, reveal_personal_emails: true },
+    payload,
     { headers: getHeaders(apiKey) }
   );
   return res.data.person || null;
