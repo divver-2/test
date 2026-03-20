@@ -304,6 +304,16 @@
     }
     .btn-mailto:hover { border-color: var(--accent); color: var(--accent-hover); }
 
+    .linkedin-btn {
+      display: inline-flex; align-items: center; gap: 6px;
+      background: var(--surface2); border: 1px solid var(--border);
+      border-radius: 8px; padding: 8px 13px; font-size: 0.845rem;
+      color: var(--accent-hover); text-decoration: none; transition: all 0.15s;
+      margin-bottom: 10px;
+    }
+    .linkedin-btn:hover { border-color: var(--accent); background: var(--accent-soft); }
+    .linkedin-icon { width: 15px; height: 15px; flex-shrink: 0; }
+
     .hidden { display: none !important; }
 
     @media (max-width: 620px) {
@@ -319,7 +329,7 @@
 <div class="header">
   <div>
     <h1>Outreach Hub</h1>
-    <p>Type a company name — we'll find the CEO, enrich the data, and add them to Apollo automatically.</p>
+    <p>Type a website domain — we'll find the CEO, their email, LinkedIn, and draft an outreach email.</p>
   </div>
   <div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end;align-items:center">
     <div class="apollo-pill" id="apolloPill"><div class="pulse"></div> Apollo</div>
@@ -350,10 +360,10 @@
   <div class="search-card">
     <div class="search-row">
       <div class="field grow2">
-        <label>Company Name</label>
-        <input type="text" id="companyInput" placeholder="e.g. Stripe, Vendelux, HubSpot…" autocomplete="off" />
+        <label>Website Domain</label>
+        <input type="text" id="companyInput" placeholder="e.g. stripe.com, hubspot.com, openai.com…" autocomplete="off" />
       </div>
-      <button class="btn btn-primary" id="addBtn" onclick="addCompany()">Email Company</button>
+      <button class="btn btn-primary" id="addBtn" onclick="addCompany()">Find CEO &amp; Draft Email</button>
     </div>
   </div>
 
@@ -392,6 +402,10 @@
           <span class="email-addr" id="ceoEmail"></span>
           <span class="badge" id="emailBadge"></span>
         </div>
+        <a class="linkedin-btn hidden" id="linkedinBtn" target="_blank" rel="noopener noreferrer">
+          <svg class="linkedin-icon" viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg"><path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433a2.062 2.062 0 01-2.063-2.065 2.064 2.064 0 112.063 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z"/></svg>
+          View on LinkedIn
+        </a>
       </div>
     </div>
 
@@ -426,6 +440,7 @@
             <th>Company</th>
             <th>CEO</th>
             <th>Email</th>
+            <th>LinkedIn</th>
             <th>Industry</th>
             <th>Funding</th>
             <th>Affinity Owner</th>
@@ -514,6 +529,7 @@ async function addCompany() {
       logo:           data.company?.logo,
       ceoName:        data.ceo?.name,
       ceoEmail:       data.ceo?.email,
+      ceoLinkedin:    data.ceo?.linkedinUrl || null,
       emailVerified:  data.ceo?.emailVerified,
       industry:       data.company?.industry,
       funding:        data.company?.funding,
@@ -640,6 +656,15 @@ function renderResult(data) {
     badge.className = 'badge badge-gray'; badge.textContent = 'not found';
   }
 
+  // LinkedIn
+  const linkedinBtn = document.getElementById('linkedinBtn');
+  if (ceo?.linkedinUrl) {
+    linkedinBtn.href = ceo.linkedinUrl;
+    linkedinBtn.classList.remove('hidden');
+  } else {
+    linkedinBtn.classList.add('hidden');
+  }
+
   // Email draft
   if (data.emailDraft) {
     document.getElementById('draftSubject').textContent = data.emailDraft.subject || '';
@@ -695,7 +720,7 @@ function renderHistory() {
     `${history.length} compan${history.length === 1 ? 'y' : 'ies'}`;
 
   if (!history.length) {
-    tbody.innerHTML = `<tr><td colspan="8"><div class="empty"><span>🏢</span>No companies added yet.<br>Search above to get started.</div></td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="9"><div class="empty"><span>🏢</span>No companies added yet.<br>Enter a domain above to get started.</div></td></tr>`;
     return;
   }
 
@@ -717,6 +742,7 @@ function renderHistory() {
         </td>
         <td>${esc(h.ceoName || '—')}</td>
         <td class="td-email">${esc(h.ceoEmail || '—')}</td>
+        <td>${h.ceoLinkedin ? `<a href="${esc(h.ceoLinkedin)}" target="_blank" rel="noopener noreferrer" style="color:var(--accent-hover);font-size:0.8rem;text-decoration:none">LinkedIn ↗</a>` : '<span style="color:var(--muted)">—</span>'}</td>
         <td><span style="color:var(--muted);font-size:0.8rem">${esc(cap(h.industry || '—'))}</span></td>
         <td>${h.funding ? `<span class="badge badge-accent">$${esc(h.funding)}</span>` : '<span style="color:var(--muted)">—</span>'}</td>
         <td>${h.affinityOwner ? `<span class="badge badge-accent">${esc(h.affinityOwner)}</span>` : '<span style="color:var(--muted)">—</span>'}</td>

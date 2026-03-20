@@ -316,6 +316,7 @@ async function runOutreachByCompany({ companyName, apiKey }) {
       name: ceoName,
       email: ceoEmail,
       title: results.ceo?.title,
+      linkedinUrl: results.ceo?.linkedin_url || null,
       emailVerified: results.ceo?.email_status === 'verified',
     },
     company: {
