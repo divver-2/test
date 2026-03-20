@@ -120,7 +120,7 @@ async function searchCompanyByName(name, apiKey) {
 async function enrichPersonById(apolloId, apiKey) {
   const res = await axios.post(
     `${APOLLO_BASE}/people/match`,
-    { id: apolloId },
+    { id: apolloId, reveal_personal_emails: true },
     { headers: getHeaders(apiKey) }
   );
   return res.data.person || null;
