@@ -249,7 +249,7 @@ async function runOutreachByCompany({ companyName, apiKey }) {
       if (ceoBasic?.first_name) {
         console.log('[Step 3] CEO found:', ceoBasic.first_name, ceoBasic.last_name, '— enriching for email');
         const enriched = await apollo.enrichPersonByNameAndDomain(
-          ceoBasic.first_name, ceoBasic.last_name, domain, apiKey, ceoBasic.id
+          ceoBasic.first_name, ceoBasic.last_name, domain, apiKey, ceoBasic.id, orgName
         );
         results.ceo = enriched || ceoBasic;
       } else {

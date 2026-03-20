@@ -1,6 +1,6 @@
 const axios = require('axios');
 
-const APOLLO_BASE = 'https://api.apollo.io/v1';
+const APOLLO_BASE = 'https://api.apollo.io/api/v1';
 
 function getHeaders(apiKey) {
   return {
@@ -134,9 +134,9 @@ async function enrichPersonById(apolloId, apiKey) {
 
 // Enrich a person by name + domain (works on free plan, consumes 1 email credit)
 // Pass apolloId (from search result) for best match accuracy — free plan obfuscates last names
-async function enrichPersonByNameAndDomain(firstName, lastName, domain, apiKey, apolloId = null) {
+async function enrichPersonByNameAndDomain(firstName, lastName, domain, apiKey, apolloId = null, orgName = null) {
   const payload = { first_name: firstName, domain, reveal_personal_emails: true };
-  if (lastName) payload.last_name = lastName;
+  if (orgName) payload.organization_name = orgName;
   if (apolloId) payload.id = apolloId;
   const res = await axios.post(
     `${APOLLO_BASE}/people/match`,
