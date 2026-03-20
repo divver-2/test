@@ -205,21 +205,29 @@ async function runOutreachByCompany({ companyName, apiKey }) {
   // 1. Search for company to get domain
   let domain = null;
   try {
+    console.log('[Step 1] Searching company:', companyName);
     const found = await apollo.searchCompanyByName(companyName, apiKey);
     if (found) {
       results.organization = found;
       domain = found.primary_domain || found.domain;
+      console.log('[Step 1] Found:', found.name, '| domain:', domain);
+    } else {
+      console.log('[Step 1] No company found');
     }
   } catch (e) {
+    console.error('[Step 1] FAILED:', e.message, e.response?.data);
     results.errors.push(`Company search failed: ${e.message}`);
   }
 
   // 2. Enrich org for full details
   if (domain) {
     try {
+      console.log('[Step 2] Enriching org for domain:', domain);
       const enriched = await apollo.enrichOrganization(domain, apiKey);
       if (enriched) results.organization = enriched;
+      console.log('[Step 2] Done');
     } catch (e) {
+      console.error('[Step 2] FAILED:', e.message, e.response?.data);
       results.errors.push(`Organization enrichment failed: ${e.message}`);
     }
   }
@@ -229,13 +237,17 @@ async function runOutreachByCompany({ companyName, apiKey }) {
   // 3. Find CEO and enrich for verified email
   if (domain) {
     try {
+      console.log('[Step 3] Finding CEO for domain:', domain);
       const ceoBasic = await apollo.findCEO(domain, apiKey);
       if (ceoBasic?.id) {
+        console.log('[Step 3] CEO found, enriching by ID:', ceoBasic.id);
         results.ceo = await apollo.enrichPersonById(ceoBasic.id, apiKey) || ceoBasic;
       } else {
         results.ceo = ceoBasic;
       }
+      console.log('[Step 3] Done');
     } catch (e) {
+      console.error('[Step 3] FAILED:', e.message, e.response?.data);
       results.errors.push(`CEO lookup failed: ${e.message}`);
     }
   }
