@@ -1,6 +1,5 @@
 const axios = require('axios');
 
-// Points to the local MCP proxy instead of api.apollo.io directly
 const APOLLO_BASE = 'http://localhost:3001/v1';
 
 function getHeaders() {
