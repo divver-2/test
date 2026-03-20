@@ -537,10 +537,15 @@ function getApiKey() { return localStorage.getItem('apollo_api_key') || ''; }
 
 function toggleSettings() {
   const panel = document.getElementById('settingsPanel');
-  panel.classList.toggle('open');
-  if (panel.classList.contains('open')) {
+  const isOpen = panel.classList.contains('open');
+  if (isOpen) {
+    panel.classList.remove('open');
+    setTimeout(() => panel.classList.add('hidden'), 250);
+  } else {
+    panel.classList.remove('hidden');
+    requestAnimationFrame(() => requestAnimationFrame(() => panel.classList.add('open')));
     document.getElementById('apolloKeyInput').value = getApiKey();
-    setTimeout(() => document.getElementById('apolloKeyInput').focus(), 50);
+    setTimeout(() => document.getElementById('apolloKeyInput').focus(), 300);
   }
 }
 
