@@ -47,7 +47,7 @@ async function findPerson(firstName, lastName, apiKey) {
   const client = getClient(apiKey);
   const term = `${firstName || ''} ${lastName || ''}`.trim();
   const res = await client.get('/persons', { params: { term, page_size: 5 } });
-  const people = res.data?.persons || [];
+  const people = res.data?.persons || (Array.isArray(res.data) ? res.data : []);
   const exact = people.find(p =>
     p.first_name?.toLowerCase() === (firstName || '').toLowerCase() &&
     p.last_name?.toLowerCase() === (lastName || '').toLowerCase()
@@ -78,15 +78,19 @@ async function getUsers(apiKey) {
   const client = getClient(apiKey);
   try {
     const res = await client.get('/users');
-    return res.data || [];
+    // Affinity v1 returns an array directly or { users: [...] }
+    if (Array.isArray(res.data)) return res.data;
+    if (Array.isArray(res.data?.users)) return res.data.users;
+    return [];
   } catch {
-    // Fall back to whoami if /users isn't available
-    const me = await getClient(apiKey).get('/auth/whoami');
-    return me.data ? [me.data] : [];
+    try {
+      const me = await getClient(apiKey).get('/auth/whoami');
+      return me.data ? [me.data] : [];
+    } catch { return []; }
   }
 }
 
-// Find user whose name matches the sender (fuzzy)
+// Find user whose name matches (fuzzy)
 async function findUserByName(name, apiKey) {
   if (!name) return null;
   const users = await getUsers(apiKey);
@@ -104,7 +108,7 @@ async function findUserByName(name, apiKey) {
 async function getLists(apiKey) {
   const client = getClient(apiKey);
   const res = await client.get('/lists');
-  return res.data || [];
+  return Array.isArray(res.data) ? res.data : (res.data?.lists || []);
 }
 
 // Find the sourcing list — looks for a list whose name contains "sourcing"
@@ -134,17 +138,22 @@ async function addOrgToList(listId, orgId, apiKey) {
 async function getListFields(listId, apiKey) {
   const client = getClient(apiKey);
   const res = await client.get('/fields', { params: { list_id: listId } });
-  return res.data || [];
+  return Array.isArray(res.data) ? res.data : [];
+}
+
+async function getGlobalFields(apiKey) {
+  const client = getClient(apiKey);
+  try {
+    const res = await client.get('/fields', { params: { value_type: 0 } });
+    return Array.isArray(res.data) ? res.data : [];
+  } catch { return []; }
 }
 
 async function setFieldValue({ fieldId, entityId, listEntryId, value }, apiKey) {
   const client = getClient(apiKey);
-  const res = await client.post('/field-values', {
-    field_id: fieldId,
-    entity_id: entityId,
-    list_entry_id: listEntryId,
-    value,
-  });
+  const payload = { field_id: fieldId, entity_id: entityId, value };
+  if (listEntryId) payload.list_entry_id = listEntryId;
+  const res = await client.post('/field-values', payload);
   return res.data;
 }
 
@@ -258,12 +267,7 @@ async function markConnected({ priorityFieldValueId, connectedOptionId }, apiKey
 // ── Set global owner on an organization ───────────────────────────────────────
 
 async function setGlobalOwner(orgId, ownerName, apiKey) {
-  const client = getClient(apiKey);
-  let globalFields = [];
-  try {
-    const res = await client.get('/fields', { params: { value_type: 0 } });
-    globalFields = Array.isArray(res.data) ? res.data : [];
-  } catch { return false; }
+  const globalFields = await getGlobalFields(apiKey);
 
   const ownerField = globalFields.find(f =>
     f.name?.toLowerCase() === 'owner' ||
@@ -298,11 +302,7 @@ async function lookupCompanyInAffinity(companyName, apiKey) {
   };
 
   // Get global field definitions
-  let globalFields = [];
-  try {
-    const res = await client.get('/fields', { params: { value_type: 0 } });
-    globalFields = Array.isArray(res.data) ? res.data : [];
-  } catch { /* ok */ }
+  const globalFields = await getGlobalFields(apiKey);
 
   // Get field values for this org
   let fieldValues = [];
@@ -322,12 +322,10 @@ async function lookupCompanyInAffinity(companyName, apiKey) {
     if (ownerFV?.value != null) {
       const raw = ownerFV.value;
       if (typeof raw === 'object' && raw !== null) {
-        // Affinity returned the user object directly
         result.owner = raw.name ||
           `${raw.first_name || ''} ${raw.last_name || ''}`.trim() ||
           String(raw.id || raw);
       } else {
-        // raw is a user ID — look it up
         try {
           const users = await getUsers(apiKey);
           const user = users.find(u => u.id === raw);
@@ -342,15 +340,19 @@ async function lookupCompanyInAffinity(companyName, apiKey) {
   // Get email interactions
   try {
     const res = await client.get('/interactions', {
-      params: { organization_id: org.id },
+      params: { organization_id: org.id, type: 'email' },
     });
     const interactions = res.data?.interactions || (Array.isArray(res.data) ? res.data : []);
     const emails = interactions.filter(i =>
-      !i.interaction_type || i.interaction_type === 'email'
+      !i.interaction_type || i.interaction_type === 'email' || i.type === 'email'
     );
     result.emailsSent = emails.length;
-    if (emails.length > 0) result.lastEmailDate = emails[0]?.date || null;
-  } catch { /* interactions endpoint may not exist */ }
+    if (emails.length > 0) {
+      // Sort descending to get the most recent first
+      const sorted = emails.sort((a, b) => new Date(b.date || b.created_at || 0) - new Date(a.date || a.created_at || 0));
+      result.lastEmailDate = sorted[0]?.date || sorted[0]?.created_at || null;
+    }
+  } catch { /* interactions endpoint may vary */ }
 
   return result;
 }

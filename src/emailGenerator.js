@@ -1,6 +1,6 @@
 // Generates personalized CEO outreach emails based on enriched company/person data
 
-const FOLLOWUP_DELAY_DAYS = 45; // ~1.5 months
+const FOLLOWUP_DELAY_DAYS = 35; // 5 weeks
 
 function getDomain(email) {
   return email.split('@')[1];
@@ -106,7 +106,7 @@ function buildEmailSequence({ ceoName, companyName, industry, senderName }) {
   const initial = generateInitialEmail({ ceoName, companyName, industry, senderName });
   emails.push({ ...initial, delayDays: 0, type: 'initial' });
 
-  // Emails 2-5: Follow-ups every 45 days
+  // Emails 2-5: Follow-ups every 35 days (5 weeks)
   for (let i = 0; i < 4; i++) {
     const followUp = generateFollowUps({ ceoName, companyName, senderName, followUpIndex: i });
     emails.push({ ...followUp, delayDays: FOLLOWUP_DELAY_DAYS * (i + 1), type: `followup_${i + 1}` });

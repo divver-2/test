@@ -2,7 +2,7 @@ require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 const path = require('path');
-const { runOutreachSequence, runOutreachByCompany } = require('./src/sequenceManager');
+const { runOutreachSequence, runOutreachByCompany, launchEmailOutreach } = require('./src/sequenceManager');
 const { buildEmailSequence } = require('./src/emailGenerator');
 const apollo = require('./src/apollo');
 const affinity = require('./src/affinity');
@@ -11,6 +11,40 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
+
+// Company/domain lookup — enrich by name or domain, find CEO, lookup Affinity
+app.post('/api/company', async (req, res) => {
+  const { companyName, apiKey: bodyKey } = req.body;
+  if (!companyName) return res.status(400).json({ error: 'companyName is required' });
+
+  const apiKey = bodyKey || process.env.APOLLO_API_KEY;
+  if (!apiKey) return res.status(400).json({ error: 'Apollo API key is required — enter it in Settings' });
+
+  try {
+    const result = await runOutreachByCompany({ companyName, apiKey });
+    res.json(result);
+  } catch (err) {
+    console.error('[/api/company] Error:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Send outreach — create Apollo CRM records, build sequence with email steps, enroll contact
+app.post('/api/send-outreach', async (req, res) => {
+  const { companyData, ceoData, emailSequence, apiKey: bodyKey } = req.body;
+  if (!ceoData?.email) return res.status(400).json({ error: 'ceoData.email is required' });
+
+  const apiKey = bodyKey || process.env.APOLLO_API_KEY;
+  if (!apiKey) return res.status(400).json({ error: 'Apollo API key is required' });
+
+  try {
+    const result = await launchEmailOutreach({ companyData, ceoData, emailSequence, apiKey });
+    res.json(result);
+  } catch (err) {
+    console.error('[/api/send-outreach] Error:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
 
 // Preview endpoint — enriches data and generates emails without touching Apollo sequences
 app.post('/api/preview', async (req, res) => {
@@ -32,11 +66,7 @@ app.post('/api/preview', async (req, res) => {
     const ceoData = ceo.status === 'fulfilled' ? ceo.value : null;
     const contactData = contact.status === 'fulfilled' ? contact.value : null;
 
-    const orgName =
-      organization?.name ||
-      contactData?.organization?.name ||
-      domain;
-
+    const orgName = organization?.name || contactData?.organization?.name || domain;
     const ceoName = ceoData
       ? `${ceoData.first_name || ''} ${ceoData.last_name || ''}`.trim()
       : null;
@@ -54,7 +84,7 @@ app.post('/api/preview', async (req, res) => {
         name: ceoName,
         email: ceoData?.email || ceoData?.personal_emails?.[0] || null,
         title: ceoData?.title || 'CEO',
-        linkedinUrl: ceoData?.linkedin_url,
+        linkedinUrl: ceoData?.linkedin_url || null,
       },
       company: {
         name: orgName,
@@ -71,23 +101,7 @@ app.post('/api/preview', async (req, res) => {
   }
 });
 
-// Company lookup endpoint — enrich by name, find CEO, lookup Affinity
-app.post('/api/company', async (req, res) => {
-  const { companyName, apiKey: bodyKey } = req.body;
-  if (!companyName) return res.status(400).json({ error: 'companyName is required' });
-
-  const apiKey = bodyKey || process.env.APOLLO_API_KEY;
-  if (!apiKey) return res.status(400).json({ error: 'Apollo API key is required — enter it in Settings' });
-
-  try {
-    const result = await runOutreachByCompany({ companyName, apiKey });
-    res.json(result);
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
-// Launch endpoint — runs the full sequence: enrich, upsert CRM, create Apollo sequence
+// Full launch from email — enrich, upsert CRM, create Apollo sequence
 app.post('/api/launch', async (req, res) => {
   const { email, senderName, apiKey } = req.body;
   if (!email) return res.status(400).json({ error: 'email is required' });
@@ -107,7 +121,7 @@ app.post('/api/launch', async (req, res) => {
   }
 });
 
-// Mark a company as Connected in Affinity (updates priority field)
+// Mark a company as Connected in Affinity
 app.post('/api/affinity/mark-connected', async (req, res) => {
   const { priorityFieldValueId, connectedOptionId } = req.body;
   const affinityKey = process.env.AFFINITY_API_KEY;
