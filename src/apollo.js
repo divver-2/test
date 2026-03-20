@@ -34,7 +34,7 @@ async function findCEO(domain, apiKey) {
   const res = await axios.post(
     `${APOLLO_BASE}/mixed_people/search`,
     {
-      organization_domains: [domain],
+      q_organization_domains_list: [domain],
       person_titles: [
         'CEO', 'Chief Executive Officer', 'Founder & CEO', 'Co-Founder & CEO',
         'Founder and CEO', 'Co-founder and CEO', 'Founder', 'Co-Founder',
