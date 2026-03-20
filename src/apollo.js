@@ -46,7 +46,9 @@ async function findCEO(domain, apiKey) {
     { headers: getHeaders(apiKey) }
   );
   const people = res.data.people || [];
-  return people[0] || null;
+  const person = people[0] || null;
+  console.log('[Apollo] findCEO result:', person ? { id: person.id, name: `${person.first_name} ${person.last_name}`, title: person.title } : 'null');
+  return person;
 }
 
 // Search or create a contact in Apollo CRM

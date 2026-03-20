@@ -20,7 +20,8 @@ function getClient(apiKey) {
 async function findOrganization(name, apiKey) {
   const client = getClient(apiKey);
   const res = await client.get('/organizations', { params: { term: name, page_size: 5 } });
-  const orgs = res.data?.organizations || [];
+  const orgs = res.data?.organizations || (Array.isArray(res.data) ? res.data : []);
+  console.log(`[Affinity] findOrganization("${name}") → ${orgs.length} results:`, orgs.map(o => o.name));
   const exact = orgs.find(o => o.name?.toLowerCase() === name.toLowerCase());
   return exact || orgs[0] || null;
 }
