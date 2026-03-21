@@ -193,6 +193,21 @@
     .badge-gray { background: var(--surface2); color: var(--muted); border: 1px solid var(--border); }
     .badge-accent { background: var(--accent-soft); color: var(--accent-hover); border: 1px solid rgba(99,102,241,0.25); }
 
+    /* Send status banner */
+    .send-status {
+      display: flex; align-items: center; gap: 10px;
+      border-radius: 9px; padding: 11px 16px; margin: 0 24px 0 24px;
+      font-size: 0.875rem; font-weight: 600;
+    }
+    .send-status-ok {
+      background: var(--green-soft); border: 1px solid var(--green-border); color: var(--green);
+    }
+    .send-status-warn {
+      background: var(--yellow-soft); border: 1px solid rgba(245,158,11,0.3); color: var(--yellow);
+    }
+    .send-status-icon { font-size: 1.1rem; flex-shrink: 0; }
+    .send-status-sub { font-size: 0.775rem; font-weight: 400; opacity: 0.85; margin-top: 1px; }
+
     /* Footer status */
     .result-footer {
       border-top: 1px solid var(--border);
@@ -408,6 +423,9 @@
     <!-- Footer -->
     <div class="result-footer" id="resultFooter"></div>
 
+    <!-- Send status -->
+    <div id="sendStatus" style="padding:14px 0 0"></div>
+
     <!-- Email draft -->
     <div class="email-draft" id="emailDraftSection">
       <div class="col-label" style="margin-bottom:12px">Proposed Email</div>
@@ -440,6 +458,7 @@
             <th>Funding</th>
             <th>Affinity Owner</th>
             <th>Emails Sent</th>
+            <th>Status</th>
             <th>Added</th>
           </tr>
         </thead>
@@ -703,6 +722,25 @@ function renderResult(data) {
     ? `<div style="width:100%;margin-top:6px;font-size:0.775rem;color:var(--yellow)">⚠ ${data.errors.map(esc).join(' · ')}</div>`
     : '');
 
+  // Send status
+  const hasOwner = !!(affinity?.owners?.length || affinity?.owner);
+  const ownerList = (affinity?.owners?.length ? affinity.owners : (affinity?.owner ? [affinity.owner] : [])).map(esc).join(', ');
+  document.getElementById('sendStatus').innerHTML = hasOwner
+    ? `<div class="send-status send-status-warn">
+        <span class="send-status-icon">⚠️</span>
+        <div>
+          <div>Confirm before sending</div>
+          <div class="send-status-sub">This company already has an owner in Affinity: ${ownerList}</div>
+        </div>
+      </div>`
+    : `<div class="send-status send-status-ok">
+        <span class="send-status-icon">✅</span>
+        <div>
+          <div>OK to send</div>
+          <div class="send-status-sub">No owner assigned in Affinity — safe to reach out</div>
+        </div>
+      </div>`;
+
   document.getElementById('resultCard').classList.remove('hidden');
 }
 
@@ -713,7 +751,7 @@ function renderHistory() {
     `${history.length} compan${history.length === 1 ? 'y' : 'ies'}`;
 
   if (!history.length) {
-    tbody.innerHTML = `<tr><td colspan="8"><div class="empty"><span>🏢</span>No companies added yet.<br>Search above to get started.</div></td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="9"><div class="empty"><span>🏢</span>No companies added yet.<br>Search above to get started.</div></td></tr>`;
     return;
   }
 
@@ -739,6 +777,9 @@ function renderHistory() {
         <td>${h.funding ? `<span class="badge badge-accent">$${esc(h.funding)}</span>` : '<span style="color:var(--muted)">—</span>'}</td>
         <td>${(h.affinityOwners?.length ? h.affinityOwners : (h.affinityOwner ? [h.affinityOwner] : [])).map(o => `<span class="badge badge-accent" style="margin-right:3px">${esc(o)}</span>`).join('') || '<span style="color:var(--muted)">—</span>'}</td>
         <td>${h.affinityEmails > 0 ? `<span class="badge badge-green">${h.affinityEmails} sent</span>` : '<span class="badge badge-gray">None</span>'}</td>
+        <td>${(h.affinityOwners?.length || h.affinityOwner)
+          ? '<span class="badge badge-yellow">⚠ Confirm first</span>'
+          : '<span class="badge badge-green">✓ OK to send</span>'}</td>
         <td class="td-date">${fmtDate(h.addedAt)}</td>
       </tr>`;
   }).join('');
