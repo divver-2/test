@@ -19,38 +19,82 @@ async function enrichContact(email, apiKey) {
   return res.data.person || null;
 }
 
-// Enrich the organization to find details by domain
+// Enrich the organization to find details by domain.
+// Falls back to mixed_companies/search on 403 (free plan).
 async function enrichOrganization(domain, apiKey) {
-  const res = await axios.post(
-    `${APOLLO_BASE}/organizations/enrich`,
-    { domain },
-    { headers: getHeaders(apiKey) }
-  );
-  return res.data.organization || null;
+  try {
+    const res = await axios.post(
+      `${APOLLO_BASE}/organizations/enrich`,
+      { domain },
+      { headers: getHeaders(apiKey) }
+    );
+    return res.data.organization || null;
+  } catch (e) {
+    if (e.response?.status !== 403) throw e;
+    console.log('[Apollo] organizations/enrich not available, falling back to mixed_companies/search');
+    const res = await axios.post(
+      `${APOLLO_BASE}/mixed_companies/search`,
+      { q_organization_name: domain, per_page: 1 },
+      { headers: getHeaders(apiKey) }
+    );
+    return (res.data.organizations || [])[0] || null;
+  }
 }
 
-// Find the CEO of a company by domain using mixed_people/search
-async function findCEO(domain, apiKey) {
+// Find CEO via org chart IDs (free-plan fallback): look up company, then enrich each root person.
+async function findCEOViaOrgChart(domain, apiKey) {
   const res = await axios.post(
-    `${APOLLO_BASE}/mixed_people/search`,
-    {
-      q_organization_domains_list: [domain],
-      person_seniorities: ['c_suite'],
-      person_titles: [
-        'CEO', 'Chief Executive Officer', 'Founder & CEO', 'Co-Founder & CEO',
-        'Founder and CEO', 'Co-founder and CEO', 'Founder', 'Co-Founder',
-        'Managing Director', 'President', 'Owner',
-      ],
-      per_page: 5,
-    },
+    `${APOLLO_BASE}/mixed_companies/search`,
+    { q_organization_name: domain, per_page: 1 },
     { headers: getHeaders(apiKey) }
   );
-  const people = res.data.people || [];
-  const ceo = people.find(p => /ceo|chief executive|founder/i.test(p.title || '')) || people[0] || null;
-  console.log('[Apollo] findCEO result:', ceo
-    ? { id: ceo.id, name: `${ceo.first_name} ${ceo.last_name}`, title: ceo.title }
-    : 'null');
-  return ceo;
+  const org = (res.data.organizations || [])[0];
+  const personIds = org?.org_chart_root_people_ids || [];
+  if (!personIds.length) {
+    console.log('[Apollo] org chart fallback: no root person IDs found');
+    return null;
+  }
+  for (const id of personIds.slice(0, 3)) {
+    try {
+      const person = await enrichPersonById(id, apiKey);
+      if (person) {
+        console.log('[Apollo] org chart fallback found:', person.first_name, person.last_name, person.title);
+        return person;
+      }
+    } catch (e) { /* try next */ }
+  }
+  return null;
+}
+
+// Find the CEO of a company by domain.
+// Tries mixed_people/search (paid) first, falls back to org chart (free).
+async function findCEO(domain, apiKey) {
+  try {
+    const res = await axios.post(
+      `${APOLLO_BASE}/mixed_people/search`,
+      {
+        q_organization_domains_list: [domain],
+        person_seniorities: ['c_suite'],
+        person_titles: [
+          'CEO', 'Chief Executive Officer', 'Founder & CEO', 'Co-Founder & CEO',
+          'Founder and CEO', 'Co-founder and CEO', 'Founder', 'Co-Founder',
+          'Managing Director', 'President', 'Owner',
+        ],
+        per_page: 5,
+      },
+      { headers: getHeaders(apiKey) }
+    );
+    const people = res.data.people || [];
+    const ceo = people.find(p => /ceo|chief executive|founder/i.test(p.title || '')) || people[0] || null;
+    console.log('[Apollo] findCEO result:', ceo
+      ? { id: ceo.id, name: `${ceo.first_name} ${ceo.last_name}`, title: ceo.title }
+      : 'null');
+    return ceo;
+  } catch (e) {
+    if (e.response?.status !== 403) throw e;
+    console.log('[Apollo] mixed_people/search not available, trying org chart fallback');
+    return findCEOViaOrgChart(domain, apiKey);
+  }
 }
 
 // Search or find existing contact in Apollo CRM
