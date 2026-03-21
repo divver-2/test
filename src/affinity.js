@@ -105,14 +105,16 @@ async function resolveOwnerValue(raw, apiKey, cachedUsers) {
   if (typeof raw === 'object') return userName(raw);
   // raw is a user ID — search cached list first (use == for type safety)
   const users = cachedUsers || await getUsers(apiKey);
+  console.log('[Affinity] resolveOwner: looking for', raw, 'in', users.length, 'users, IDs:', users.map(u => u.id));
   // eslint-disable-next-line eqeqeq
   const user = users.find(u => u.id == raw);
   if (user) return userName(user);
   // Last resort: fetch the specific user by ID
   try {
     const res = await getClient(apiKey).get(`/users/${raw}`);
+    console.log('[Affinity] /users/:id response:', JSON.stringify(res.data));
     if (res.data) return userName(res.data);
-  } catch { /* ignore */ }
+  } catch (e) { console.log('[Affinity] /users/:id error:', e.response?.status, e.message); }
   return null;
 }
 
@@ -357,21 +359,41 @@ async function lookupCompanyInAffinity(companyName, apiKey, domain) {
   } catch (e) { console.log('[Affinity] owner error:', e.response?.status, e.message); }
   console.log('[Affinity] resolved owner:', result.owner);
 
-  // ── Last email sent (via activity-logs) ───────────────────────────────────
+  // ── Last email sent (via interactions) ────────────────────────────────────
   try {
-    const intRes = await client.get('/activity-logs', {
-      params: { organization_id: org.id, type: 'email' },
+    const intRes = await client.get('/interactions', {
+      params: { organization_id: org.id },
     });
-    const logs = intRes.data?.activity_logs || intRes.data?.interactions || (Array.isArray(intRes.data) ? intRes.data : []);
-    result.emailsSent = logs.length;
-    if (logs.length > 0) {
-      const sorted = [...logs].sort(
+    console.log('[Affinity] interactions raw keys:', Object.keys(intRes.data || {}));
+    const logs = intRes.data?.email_interactions
+      || intRes.data?.interactions
+      || intRes.data?.activity_logs
+      || (Array.isArray(intRes.data) ? intRes.data : []);
+    // Filter to email type if a type field exists (Affinity uses type_id or type)
+    const emails = logs.filter(l => !l.type || l.type === 'email' || l.type_id === 0 || l.type_id === 1);
+    result.emailsSent = emails.length;
+    if (emails.length > 0) {
+      const sorted = [...emails].sort(
         (a, b) => new Date(b.date || b.created_at || 0) - new Date(a.date || a.created_at || 0)
       );
       result.lastEmailDate = sorted[0]?.date || sorted[0]?.created_at || null;
     }
     console.log('[Affinity] emails:', result.emailsSent, '| lastEmailDate:', result.lastEmailDate);
-  } catch (e) { console.log('[Affinity] activity-logs error:', e.response?.status, e.message); }
+  } catch (e) {
+    console.log('[Affinity] interactions error:', e.response?.status, e.message);
+    // Fallback: try activity-logs without type filter
+    try {
+      const intRes2 = await client.get('/activity-logs', { params: { organization_id: org.id } });
+      console.log('[Affinity] activity-logs raw keys:', Object.keys(intRes2.data || {}));
+      const logs2 = intRes2.data?.activity_logs || intRes2.data?.interactions || (Array.isArray(intRes2.data) ? intRes2.data : []);
+      result.emailsSent = logs2.length;
+      if (logs2.length > 0) {
+        const sorted2 = [...logs2].sort((a, b) => new Date(b.date || b.created_at || 0) - new Date(a.date || a.created_at || 0));
+        result.lastEmailDate = sorted2[0]?.date || sorted2[0]?.created_at || null;
+      }
+      console.log('[Affinity] activity-logs emails:', result.emailsSent, '| lastEmailDate:', result.lastEmailDate);
+    } catch (e2) { console.log('[Affinity] activity-logs error:', e2.response?.status, e2.message); }
+  }
 
   return result;
 }
