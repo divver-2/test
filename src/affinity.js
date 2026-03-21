@@ -395,20 +395,17 @@ async function lookupCompanyInAffinity(companyName, apiKey, domain) {
 // Read last_contacted_at directly from the organization object — fast and reliable
 async function getLastContacted(orgId, client) {
   try {
-    const res = await client.get(`/organizations/${orgId}`);
-    const org = res.data;
-    // Log all top-level keys + any date-shaped values to find the right field
-    const dateFields = Object.entries(org || {})
-      .filter(([, v]) => typeof v === 'string' && /\d{4}-\d{2}-\d{2}/.test(v))
-      .reduce((acc, [k, v]) => ({ ...acc, [k]: v }), {});
-    console.log('[Affinity] org date fields:', JSON.stringify(dateFields));
-    const ts = org?.last_contacted_at
-      || org?.last_interaction_at
-      || org?.last_activity_at
-      || org?.updated_at
-      || null;
-    console.log('[Affinity] last_contacted_at resolved:', ts);
-    return ts;
+    const res = await client.get('/notes', { params: { organization_id: orgId, page_size: 50 } });
+    const notes = Array.isArray(res.data) ? res.data : (res.data?.notes || []);
+    console.log('[Affinity] notes count for org', orgId, ':', notes.length);
+    if (!notes.length) return null;
+    const latest = notes.reduce((best, n) => {
+      const ts = n.created_at || n.updated_at || null;
+      if (!ts) return best;
+      return !best || new Date(ts) > new Date(best) ? ts : best;
+    }, null);
+    console.log('[Affinity] last_contacted_at (via notes):', latest);
+    return latest;
   } catch (e) {
     console.log('[Affinity] getLastContacted error:', e.response?.status, e.message);
     return null;
