@@ -302,74 +302,66 @@ async function lookupCompanyInAffinity(companyName, apiKey, domain) {
     lastEmailDate: null,
   };
 
-  // Get global field definitions
-  const globalFields = await getGlobalFields(apiKey);
-  console.log('[Affinity] global fields:', globalFields.map(f => `${f.name}(${f.id})`));
-
-  // Get field values for this org
-  let fieldValues = [];
+  // ── Global Owner ──────────────────────────────────────────────────────────
+  // Find the "Global Owner" field ID, then query field-values for it directly
   try {
-    const res = await client.get('/field-values', { params: { organization_id: org.id } });
-    fieldValues = Array.isArray(res.data) ? res.data : [];
-    console.log('[Affinity] field values:', JSON.stringify(fieldValues.slice(0, 5)));
-  } catch (e) { console.log('[Affinity] field-values error:', e.response?.status, e.message); }
+    const globalFields = await getGlobalFields(apiKey);
+    const ownerField =
+      globalFields.find(f => f.name?.toLowerCase() === 'global owner') ||
+      globalFields.find(f => f.name?.toLowerCase() === 'owner');
+    console.log('[Affinity] ownerField:', ownerField ? `${ownerField.name}(${ownerField.id})` : 'not found');
 
-  // Resolve owner field — prefer "Global Owner" exact match, then first "owner" field
-  const ownerField =
-    globalFields.find(f => f.name?.toLowerCase() === 'global owner') ||
-    globalFields.find(f => f.name?.toLowerCase() === 'owner') ||
-    globalFields.find(f => f.name?.toLowerCase().includes('owner'));
-  console.log('[Affinity] ownerField:', ownerField ? `${ownerField.name}(${ownerField.id})` : 'not found');
-  console.log('[Affinity] all field value field_ids:', fieldValues.map(fv => fv.field_id));
-  if (ownerField) {
-    const ownerFV = fieldValues.find(fv => fv.field_id === ownerField.id);
-    console.log('[Affinity] ownerFV:', JSON.stringify(ownerFV));
-    if (ownerFV?.value != null) {
-      const raw = ownerFV.value;
-      if (typeof raw === 'object' && raw !== null) {
-        result.owner = raw.name ||
-          `${raw.first_name || ''} ${raw.last_name || ''}`.trim() ||
-          String(raw.id || raw);
-      } else {
-        try {
+    if (ownerField) {
+      const fvRes = await client.get('/field-values', {
+        params: { organization_id: org.id, field_id: ownerField.id },
+      });
+      const fvs = Array.isArray(fvRes.data) ? fvRes.data : [];
+      console.log('[Affinity] owner field-values:', JSON.stringify(fvs));
+      const ownerFV = fvs.find(fv => fv.value != null);
+      if (ownerFV) {
+        const raw = ownerFV.value;
+        if (typeof raw === 'object' && raw !== null) {
+          result.owner = raw.name ||
+            `${raw.first_name || ''} ${raw.last_name || ''}`.trim() || null;
+        } else {
+          // raw is a user ID — resolve to name
           const users = await getUsers(apiKey);
           const user = users.find(u => u.id === raw);
-          result.owner = user
-            ? `${user.first_name || ''} ${user.last_name || ''}`.trim()
-            : String(raw);
-        } catch { result.owner = String(raw); }
+          result.owner = user ? `${user.first_name || ''} ${user.last_name || ''}`.trim() : String(raw);
+        }
       }
     }
-  }
+  } catch (e) { console.log('[Affinity] owner error:', e.response?.status, e.message); }
   console.log('[Affinity] resolved owner:', result.owner);
 
-  // Get email interactions via activity-logs
+  // ── Last email sent ───────────────────────────────────────────────────────
+  // Try /emails endpoint first, fall back to /activity-logs
   try {
-    const res = await client.get('/activity-logs', {
-      params: { organization_id: org.id, type: 'email' },
-    });
-    const logs = res.data?.activity_logs || res.data?.interactions || (Array.isArray(res.data) ? res.data : []);
-    console.log('[Affinity] activity-logs count:', logs.length, '| sample:', JSON.stringify(logs[0]));
-    result.emailsSent = logs.length;
-    if (logs.length > 0) {
-      const sorted = [...logs].sort((a, b) => new Date(b.date || b.created_at || 0) - new Date(a.date || a.created_at || 0));
+    const res = await client.get('/emails', { params: { organization_id: org.id } });
+    const emails = res.data?.emails || (Array.isArray(res.data) ? res.data : []);
+    console.log('[Affinity] emails count:', emails.length);
+    result.emailsSent = emails.length;
+    if (emails.length > 0) {
+      const sorted = [...emails].sort(
+        (a, b) => new Date(b.date || b.created_at || 0) - new Date(a.date || a.created_at || 0)
+      );
       result.lastEmailDate = sorted[0]?.date || sorted[0]?.created_at || null;
     }
   } catch (e) {
-    console.log('[Affinity] activity-logs error:', e.response?.status, e.message);
-    // fallback: try without type filter
+    console.log('[Affinity] /emails error:', e.response?.status, e.message, '— trying activity-logs');
     try {
       const res2 = await client.get('/activity-logs', { params: { organization_id: org.id } });
-      const logs2 = res2.data?.activity_logs || (Array.isArray(res2.data) ? res2.data : []);
-      console.log('[Affinity] activity-logs (no filter) count:', logs2.length);
-      // filter to email-type only
-      const emails2 = logs2.filter(l => l.type === 'email' || l.interaction_type === 'email');
-      result.emailsSent = emails2.length;
-      if (emails2.length > 0) {
-        const sorted = [...emails2].sort((a, b) => new Date(b.date || b.created_at || 0) - new Date(a.date || a.created_at || 0));
+      const logs = res2.data?.activity_logs || (Array.isArray(res2.data) ? res2.data : []);
+      const emails = logs.filter(l => l.type === 'email' || l.interaction_type === 'email' || l.activity_type === 'email');
+      console.log('[Affinity] activity-logs total:', logs.length, 'emails:', emails.length);
+      result.emailsSent = emails.length;
+      if (emails.length > 0) {
+        const sorted = [...emails].sort(
+          (a, b) => new Date(b.date || b.created_at || 0) - new Date(a.date || a.created_at || 0)
+        );
         result.lastEmailDate = sorted[0]?.date || sorted[0]?.created_at || null;
       }
-    } catch (e2) { console.log('[Affinity] activity-logs fallback error:', e2.response?.status, e2.message); }
+    } catch (e2) { console.log('[Affinity] activity-logs error:', e2.response?.status, e2.message); }
   }
 
   return result;
