@@ -337,28 +337,6 @@ async function lookupCompanyInAffinity(companyName, apiKey, domain) {
   } catch (e) { console.log('[Affinity] owner error:', e.response?.status, e.message); }
   console.log('[Affinity] resolved owner:', result.owner);
 
-  // ── Last email sent ───────────────────────────────────────────────────────
-  // Affinity stores each email interaction as a null-value field-value entry on
-  // the "Interactions" / email field. Find that field, then use the most recent
-  // created_at among its field-value entries.
-  try {
-    const emailField = globalFields.find(f =>
-      /^(interactions?|emails?|last\s*email|email\s*log)$/i.test(f.name?.trim())
-    ) || globalFields.find(f => /email|interaction/i.test(f.name));
-    console.log('[Affinity] emailField:', emailField ? `${emailField.name}(${emailField.id})` : 'not found');
-
-    if (emailField) {
-      const emailFVs = fieldValues.filter(fv => fv.field_id === emailField.id);
-      console.log('[Affinity] email FV count:', emailFVs.length);
-      result.emailsSent = emailFVs.length;
-      if (emailFVs.length > 0) {
-        const sorted = [...emailFVs].sort(
-          (a, b) => new Date(b.created_at || 0) - new Date(a.created_at || 0)
-        );
-        result.lastEmailDate = sorted[0]?.created_at || null;
-      }
-    }
-  } catch (e) { console.log('[Affinity] email field error:', e.message); }
 
   return result;
 }

@@ -263,6 +263,25 @@ async function getEmailAccounts(apiKey) {
   return res.data.email_accounts || [];
 }
 
+// Get email activity for a company domain — searches contacts and returns emails sent + last email date
+async function getCompanyEmailActivity(domain, apiKey) {
+  const res = await axios.post(
+    `${APOLLO_BASE}/contacts/search`,
+    {
+      q_organization_domains_list: [domain],
+      sort_by_field: 'last_activity_date',
+      sort_ascending: false,
+      per_page: 25,
+    },
+    { headers: getHeaders(apiKey) }
+  );
+  const contacts = res.data.contacts || [];
+  const contacted = contacts.filter(c => c.last_activity_date);
+  const emailsSent = contacts.reduce((sum, c) => sum + (c.num_contacted || 0), 0);
+  const lastEmailDate = contacted[0]?.last_activity_date || null;
+  return { emailsSent, lastEmailDate };
+}
+
 // Create an account (company) in Apollo CRM
 async function upsertAccount(orgData, apiKey) {
   const res = await axios.post(
@@ -294,4 +313,5 @@ module.exports = {
   addSequenceStep,
   addContactToSequence,
   getEmailAccounts,
+  getCompanyEmailActivity,
 };

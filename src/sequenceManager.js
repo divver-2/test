@@ -203,7 +203,7 @@ async function runOutreachSequence({ email, senderName, apiKey }) {
 
 // Enrich company by name/domain: get CEO + company info from Apollo, owner + emails from Affinity
 async function runOutreachByCompany({ companyName, apiKey, affinityKey }) {
-  const results = { organization: null, ceo: null, affinityData: null, errors: [], usedHunter: false };
+  const results = { organization: null, ceo: null, affinityData: null, apolloEmails: null, errors: [], usedHunter: false };
 
   // 1. If input looks like a domain, use it directly
   const looksLikeDomain = companyName.includes('.') && !companyName.includes(' ');
@@ -333,13 +333,23 @@ async function runOutreachByCompany({ companyName, apiKey, affinityKey }) {
     senderName: 'David Divver',
   });
 
-  // 5. Lookup in Affinity — read-only: get owner + last email
+  // 5. Lookup in Affinity — read-only: get Global Owner
   const usedAffinityKey = affinityKey || process.env.AFFINITY_API_KEY;
   if (usedAffinityKey) {
     try {
       results.affinityData = await affinity.lookupCompanyInAffinity(orgName, usedAffinityKey, domain);
     } catch (e) {
       results.errors.push(`Affinity lookup failed: ${e.message}`);
+    }
+  }
+
+  // 6. Get email activity from Apollo — contacts at this domain, emails sent + last email date
+  if (domain) {
+    try {
+      results.apolloEmails = await apollo.getCompanyEmailActivity(domain, apiKey);
+      console.log('[Apollo] email activity:', results.apolloEmails);
+    } catch (e) {
+      console.log('[Apollo] email activity error:', e.response?.status, e.message);
     }
   }
 
@@ -369,9 +379,9 @@ async function runOutreachByCompany({ companyName, apiKey, affinityKey }) {
     affinity: results.affinityData ? {
       inAffinity: true,
       owner: results.affinityData.owner,
-      emailsSent: results.affinityData.emailsSent,
-      lastEmailDate: results.affinityData.lastEmailDate,
-    } : { inAffinity: false, owner: null, emailsSent: 0, lastEmailDate: null },
+      emailsSent: results.apolloEmails?.emailsSent ?? 0,
+      lastEmailDate: results.apolloEmails?.lastEmailDate ?? null,
+    } : { inAffinity: false, owner: null, emailsSent: results.apolloEmails?.emailsSent ?? 0, lastEmailDate: results.apolloEmails?.lastEmailDate ?? null },
     emailDraft: emailSequence[0] || null,
     emailSequence,
     errors: results.errors,
