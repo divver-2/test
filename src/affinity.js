@@ -304,13 +304,15 @@ async function lookupCompanyInAffinity(companyName, apiKey, domain) {
 
   // Get global field definitions
   const globalFields = await getGlobalFields(apiKey);
+  console.log('[Affinity] global fields:', globalFields.map(f => `${f.name}(${f.id})`));
 
   // Get field values for this org
   let fieldValues = [];
   try {
     const res = await client.get('/field-values', { params: { organization_id: org.id } });
     fieldValues = Array.isArray(res.data) ? res.data : [];
-  } catch { /* ok */ }
+    console.log('[Affinity] field values:', JSON.stringify(fieldValues.slice(0, 5)));
+  } catch (e) { console.log('[Affinity] field-values error:', e.response?.status, e.message); }
 
   // Resolve owner field
   const ownerField = globalFields.find(f =>
@@ -318,8 +320,10 @@ async function lookupCompanyInAffinity(companyName, apiKey, domain) {
     f.name?.toLowerCase().includes('global owner') ||
     f.name?.toLowerCase().includes('owner')
   );
+  console.log('[Affinity] ownerField:', ownerField ? `${ownerField.name}(${ownerField.id})` : 'not found');
   if (ownerField) {
     const ownerFV = fieldValues.find(fv => fv.field_id === ownerField.id);
+    console.log('[Affinity] ownerFV:', JSON.stringify(ownerFV));
     if (ownerFV?.value != null) {
       const raw = ownerFV.value;
       if (typeof raw === 'object' && raw !== null) {
@@ -337,6 +341,7 @@ async function lookupCompanyInAffinity(companyName, apiKey, domain) {
       }
     }
   }
+  console.log('[Affinity] resolved owner:', result.owner);
 
   // Get email interactions
   try {
@@ -344,16 +349,16 @@ async function lookupCompanyInAffinity(companyName, apiKey, domain) {
       params: { organization_id: org.id, type: 'email' },
     });
     const interactions = res.data?.interactions || (Array.isArray(res.data) ? res.data : []);
+    console.log('[Affinity] interactions count:', interactions.length, '| sample:', JSON.stringify(interactions[0]));
     const emails = interactions.filter(i =>
       !i.interaction_type || i.interaction_type === 'email' || i.type === 'email'
     );
     result.emailsSent = emails.length;
     if (emails.length > 0) {
-      // Sort descending to get the most recent first
       const sorted = emails.sort((a, b) => new Date(b.date || b.created_at || 0) - new Date(a.date || a.created_at || 0));
       result.lastEmailDate = sorted[0]?.date || sorted[0]?.created_at || null;
     }
-  } catch { /* interactions endpoint may vary */ }
+  } catch (e) { console.log('[Affinity] interactions error:', e.response?.status, e.message); }
 
   return result;
 }
