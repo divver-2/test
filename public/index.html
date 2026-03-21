@@ -529,6 +529,7 @@ async function addCompany() {
       funding:        data.company?.funding,
       fundingStage:   data.company?.fundingStage,
       affinityOwner:  data.affinity?.owner || null,
+      affinityOwners: data.affinity?.owners || [],
       affinityEmails: data.affinity?.emailsSent || 0,
       affinityLastEmail: data.affinity?.lastEmailDate || null,
       inAffinity:     data.affinity?.inAffinity || false,
@@ -676,9 +677,9 @@ function renderResult(data) {
       value: affinity?.inAffinity ? 'In CRM' : 'Not in CRM',
     },
     {
-      ok: !!affinity?.owner,
+      ok: !!(affinity?.owners?.length || affinity?.owner),
       label: 'Owner',
-      value: affinity?.owner ? esc(affinity.owner) : '—',
+      value: (affinity?.owners?.length ? affinity.owners : (affinity?.owner ? [affinity.owner] : [])).map(esc).join(', ') || '—',
     },
     {
       ok: affinity?.emailsSent > 0,
@@ -736,7 +737,7 @@ function renderHistory() {
         <td class="td-email">${esc(h.ceoEmail || '—')}</td>
         <td><span style="color:var(--muted);font-size:0.8rem">${esc(cap(h.industry || '—'))}</span></td>
         <td>${h.funding ? `<span class="badge badge-accent">$${esc(h.funding)}</span>` : '<span style="color:var(--muted)">—</span>'}</td>
-        <td>${h.affinityOwner ? `<span class="badge badge-accent">${esc(h.affinityOwner)}</span>` : '<span style="color:var(--muted)">—</span>'}</td>
+        <td>${(h.affinityOwners?.length ? h.affinityOwners : (h.affinityOwner ? [h.affinityOwner] : [])).map(o => `<span class="badge badge-accent" style="margin-right:3px">${esc(o)}</span>`).join('') || '<span style="color:var(--muted)">—</span>'}</td>
         <td>${h.affinityEmails > 0 ? `<span class="badge badge-green">${h.affinityEmails} sent</span>` : '<span class="badge badge-gray">None</span>'}</td>
         <td class="td-date">${fmtDate(h.addedAt)}</td>
       </tr>`;

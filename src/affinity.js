@@ -348,6 +348,7 @@ async function lookupCompanyInAffinity(companyName, apiKey, domain) {
     orgId: org.id,
     orgName: org.name,
     owner: null,
+    owners: [],
     emailsSent: 0,
     lastEmailDate: null,
   };
@@ -371,13 +372,14 @@ async function lookupCompanyInAffinity(companyName, apiKey, domain) {
       // Affinity ignores the field_id param — filter client-side
       const ownerFVs = fieldValues.filter(fv => fv.field_id === ownerField.id && fv.value != null);
       console.log('[Affinity] owner FVs:', JSON.stringify(ownerFVs));
-      // Try all FVs newest-first; return the first one we can resolve
+      // Resolve all FVs newest-first into an owners list
       const sorted = ownerFVs.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
       const users = await getUsers(apiKey);
       for (const fv of sorted) {
         const name = await resolveOwnerValue(fv.value, apiKey, users);
-        if (name) { result.owner = name; break; }
+        if (name && !result.owners.includes(name)) result.owners.push(name);
       }
+      result.owner = result.owners[0] || null;
     }
   } catch (e) { console.log('[Affinity] owner error:', e.response?.status, e.message); }
   console.log('[Affinity] resolved owner:', result.owner);
@@ -388,12 +390,10 @@ async function lookupCompanyInAffinity(companyName, apiKey, domain) {
       params: { 'organization_ids[]': org.id },
     });
     console.log('[Affinity] interactions raw keys:', Object.keys(intRes.data || {}));
-    const logs = intRes.data?.email_interactions
-      || intRes.data?.interactions
-      || intRes.data?.activity_logs
-      || (Array.isArray(intRes.data) ? intRes.data : []);
-    // Filter to email type if a type field exists (Affinity uses type_id or type)
-    const emails = logs.filter(l => !l.type || l.type === 'email' || l.type_id === 0 || l.type_id === 1);
+    // Use email_interactions directly (already email-only); fall back to filtered general interactions
+    const emails = intRes.data?.email_interactions
+      || (intRes.data?.interactions || intRes.data?.activity_logs || (Array.isArray(intRes.data) ? intRes.data : []))
+          .filter(l => !l.type || l.type === 'email' || l.type_id === 0 || l.type_id === 1);
     result.emailsSent = emails.length;
     if (emails.length > 0) {
       const sorted = [...emails].sort(
