@@ -357,11 +357,12 @@ async function lookupCompanyInAffinity(companyName, apiKey, domain) {
       // Affinity ignores the field_id param — filter client-side
       const ownerFVs = fieldValues.filter(fv => fv.field_id === ownerField.id && fv.value != null);
       console.log('[Affinity] owner FVs:', JSON.stringify(ownerFVs));
-      // Use the most recently created one
-      const ownerFV = ownerFVs.sort((a, b) => new Date(b.created_at) - new Date(a.created_at))[0];
-      if (ownerFV) {
-        const users = await getUsers(apiKey);
-        result.owner = await resolveOwnerValue(ownerFV.value, apiKey, users);
+      // Try all FVs newest-first; return the first one we can resolve
+      const sorted = ownerFVs.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+      const users = await getUsers(apiKey);
+      for (const fv of sorted) {
+        const name = await resolveOwnerValue(fv.value, apiKey, users);
+        if (name) { result.owner = name; break; }
       }
     }
   } catch (e) { console.log('[Affinity] owner error:', e.response?.status, e.message); }
@@ -463,9 +464,12 @@ async function getCompanyDetails(orgId, apiKey) {
     const fvRes = await client.get('/field-values', { params: { organization_id: orgId } });
     const fieldValues = Array.isArray(fvRes.data) ? fvRes.data : [];
     if (ownerField) {
-      const ownerFV = fieldValues.find(fv => fv.field_id === ownerField.id);
-      if (ownerFV?.value != null) {
-        owner = await resolveOwnerValue(ownerFV.value, apiKey, users);
+      const ownerFVs = fieldValues
+        .filter(fv => fv.field_id === ownerField.id && fv.value != null)
+        .sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+      for (const fv of ownerFVs) {
+        const name = await resolveOwnerValue(fv.value, apiKey, users);
+        if (name) { owner = name; break; }
       }
     }
   } catch { /* ok */ }
@@ -522,9 +526,12 @@ async function getSourcingListWithDetails(apiKey) {
         });
         const fieldValues = Array.isArray(fvRes.data) ? fvRes.data : [];
         if (ownerField) {
-          const ownerFV = fieldValues.find(fv => fv.field_id === ownerField.id);
-          if (ownerFV?.value != null) {
-            owner = await resolveOwnerValue(ownerFV.value, apiKey, users);
+          const ownerFVs = fieldValues
+            .filter(fv => fv.field_id === ownerField.id && fv.value != null)
+            .sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+          for (const fv of ownerFVs) {
+            const name = await resolveOwnerValue(fv.value, apiKey, users);
+            if (name) { owner = name; break; }
           }
         }
       } catch { /* ok */ }
