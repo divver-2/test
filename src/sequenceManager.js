@@ -202,7 +202,7 @@ async function runOutreachSequence({ email, senderName, apiKey }) {
 }
 
 // Enrich company by name/domain: get CEO + company info from Apollo, owner + emails from Affinity
-async function runOutreachByCompany({ companyName, apiKey, hunterKey }) {
+async function runOutreachByCompany({ companyName, apiKey, affinityKey }) {
   const results = { organization: null, ceo: null, affinityData: null, errors: [], usedHunter: false };
 
   // 1. If input looks like a domain, use it directly
@@ -333,15 +333,11 @@ async function runOutreachByCompany({ companyName, apiKey, hunterKey }) {
     senderName: 'David Divver',
   });
 
-  // 5. Lookup in Affinity + set global owner to David Divver
-  const affinityKey = process.env.AFFINITY_API_KEY;
-  if (affinityKey) {
+  // 5. Lookup in Affinity — read-only: get owner + last email
+  const usedAffinityKey = affinityKey || process.env.AFFINITY_API_KEY;
+  if (usedAffinityKey) {
     try {
-      results.affinityData = await affinity.lookupCompanyInAffinity(orgName, affinityKey);
-      if (results.affinityData?.orgId) {
-        const ownerSet = await affinity.setGlobalOwner(results.affinityData.orgId, 'David Divver', affinityKey);
-        if (ownerSet) results.affinityData.owner = ownerSet;
-      }
+      results.affinityData = await affinity.lookupCompanyInAffinity(orgName, usedAffinityKey, domain);
     } catch (e) {
       results.errors.push(`Affinity lookup failed: ${e.message}`);
     }

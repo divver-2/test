@@ -286,10 +286,12 @@ async function setGlobalOwner(orgId, ownerName, apiKey) {
 
 // ── Lookup company: owner + email history (read-only) ─────────────────────────
 
-async function lookupCompanyInAffinity(companyName, apiKey) {
+async function lookupCompanyInAffinity(companyName, apiKey, domain) {
   const client = getClient(apiKey);
 
-  const org = await findOrganization(companyName, apiKey);
+  // Try by name first, fall back to domain search
+  let org = await findOrganization(companyName, apiKey);
+  if (!org && domain) org = await findOrganization(domain, apiKey);
   if (!org) return null;
 
   const result = {

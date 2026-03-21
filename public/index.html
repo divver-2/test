@@ -558,7 +558,7 @@ async function addCompany() {
     const res = await fetch('/api/company', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ companyName, apiKey }),
+      body: JSON.stringify({ companyName, apiKey, affinityKey: getAffinityKey() }),
     });
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || 'Lookup failed');
