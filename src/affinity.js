@@ -357,6 +357,21 @@ async function lookupCompanyInAffinity(companyName, apiKey, domain) {
   } catch (e) { console.log('[Affinity] owner error:', e.response?.status, e.message); }
   console.log('[Affinity] resolved owner:', result.owner);
 
+  // ── Last email sent (via activity-logs) ───────────────────────────────────
+  try {
+    const intRes = await client.get('/activity-logs', {
+      params: { organization_id: org.id, type: 'email' },
+    });
+    const logs = intRes.data?.activity_logs || intRes.data?.interactions || (Array.isArray(intRes.data) ? intRes.data : []);
+    result.emailsSent = logs.length;
+    if (logs.length > 0) {
+      const sorted = [...logs].sort(
+        (a, b) => new Date(b.date || b.created_at || 0) - new Date(a.date || a.created_at || 0)
+      );
+      result.lastEmailDate = sorted[0]?.date || sorted[0]?.created_at || null;
+    }
+    console.log('[Affinity] emails:', result.emailsSent, '| lastEmailDate:', result.lastEmailDate);
+  } catch (e) { console.log('[Affinity] activity-logs error:', e.response?.status, e.message); }
 
   return result;
 }
