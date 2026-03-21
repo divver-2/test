@@ -108,9 +108,18 @@ function userName(u) {
 }
 
 // Resolve a raw owner value (user ID or object) to a display name
+// Fallback map for team member IDs that can't be fetched via the API
+const KNOWN_USERS = {
+  16057750: 'Ankit Sud',
+  87482981: 'David Divver',
+  100285871: null, // unknown — update when identified
+};
+
 async function resolveOwnerValue(raw, apiKey, cachedUsers) {
   if (!raw) return null;
   if (typeof raw === 'object') return userName(raw);
+  // Check hardcoded fallback first
+  if (raw in KNOWN_USERS && KNOWN_USERS[raw]) return KNOWN_USERS[raw];
   // raw is a user ID — search cached list first (use == for type safety)
   const users = cachedUsers || await getUsers(apiKey);
   console.log('[Affinity] resolveOwner: looking for', raw, 'in', users.length, 'users, IDs:', users.map(u => u.id));
