@@ -143,7 +143,7 @@ async function getListFields(listId, apiKey) {
 async function getGlobalFields(apiKey) {
   const client = getClient(apiKey);
   try {
-    const res = await client.get('/fields', { params: { value_type: 0 } });
+    const res = await client.get('/fields');
     return Array.isArray(res.data) ? res.data : [];
   } catch { return []; }
 }
@@ -302,29 +302,32 @@ async function lookupCompanyInAffinity(companyName, apiKey, domain) {
     lastEmailDate: null,
   };
 
+  // Fetch all field values + global field definitions in parallel
+  const [globalFields, fieldValues] = await Promise.all([
+    getGlobalFields(apiKey),
+    client.get('/field-values', { params: { organization_id: org.id } })
+      .then(r => Array.isArray(r.data) ? r.data : [])
+      .catch(e => { console.log('[Affinity] field-values error:', e.response?.status, e.message); return []; }),
+  ]);
+
   // ── Global Owner ──────────────────────────────────────────────────────────
-  // Find the "Global Owner" field ID, then query field-values for it directly
   try {
-    const globalFields = await getGlobalFields(apiKey);
     const ownerField =
       globalFields.find(f => f.name?.toLowerCase() === 'global owner') ||
       globalFields.find(f => f.name?.toLowerCase() === 'owner');
     console.log('[Affinity] ownerField:', ownerField ? `${ownerField.name}(${ownerField.id})` : 'not found');
 
     if (ownerField) {
-      const fvRes = await client.get('/field-values', {
-        params: { organization_id: org.id, field_id: ownerField.id },
-      });
-      const fvs = Array.isArray(fvRes.data) ? fvRes.data : [];
-      console.log('[Affinity] owner field-values:', JSON.stringify(fvs));
-      const ownerFV = fvs.find(fv => fv.value != null);
+      // Affinity ignores the field_id param — filter client-side
+      const ownerFVs = fieldValues.filter(fv => fv.field_id === ownerField.id && fv.value != null);
+      console.log('[Affinity] owner FVs:', JSON.stringify(ownerFVs));
+      // Use the most recently created one
+      const ownerFV = ownerFVs.sort((a, b) => new Date(b.created_at) - new Date(a.created_at))[0];
       if (ownerFV) {
         const raw = ownerFV.value;
         if (typeof raw === 'object' && raw !== null) {
-          result.owner = raw.name ||
-            `${raw.first_name || ''} ${raw.last_name || ''}`.trim() || null;
+          result.owner = raw.name || `${raw.first_name || ''} ${raw.last_name || ''}`.trim() || null;
         } else {
-          // raw is a user ID — resolve to name
           const users = await getUsers(apiKey);
           const user = users.find(u => u.id === raw);
           result.owner = user ? `${user.first_name || ''} ${user.last_name || ''}`.trim() : String(raw);
@@ -335,34 +338,27 @@ async function lookupCompanyInAffinity(companyName, apiKey, domain) {
   console.log('[Affinity] resolved owner:', result.owner);
 
   // ── Last email sent ───────────────────────────────────────────────────────
-  // Try /emails endpoint first, fall back to /activity-logs
+  // Affinity stores each email interaction as a null-value field-value entry on
+  // the "Interactions" / email field. Find that field, then use the most recent
+  // created_at among its field-value entries.
   try {
-    const res = await client.get('/emails', { params: { organization_id: org.id } });
-    const emails = res.data?.emails || (Array.isArray(res.data) ? res.data : []);
-    console.log('[Affinity] emails count:', emails.length);
-    result.emailsSent = emails.length;
-    if (emails.length > 0) {
-      const sorted = [...emails].sort(
-        (a, b) => new Date(b.date || b.created_at || 0) - new Date(a.date || a.created_at || 0)
-      );
-      result.lastEmailDate = sorted[0]?.date || sorted[0]?.created_at || null;
-    }
-  } catch (e) {
-    console.log('[Affinity] /emails error:', e.response?.status, e.message, '— trying activity-logs');
-    try {
-      const res2 = await client.get('/activity-logs', { params: { organization_id: org.id } });
-      const logs = res2.data?.activity_logs || (Array.isArray(res2.data) ? res2.data : []);
-      const emails = logs.filter(l => l.type === 'email' || l.interaction_type === 'email' || l.activity_type === 'email');
-      console.log('[Affinity] activity-logs total:', logs.length, 'emails:', emails.length);
-      result.emailsSent = emails.length;
-      if (emails.length > 0) {
-        const sorted = [...emails].sort(
-          (a, b) => new Date(b.date || b.created_at || 0) - new Date(a.date || a.created_at || 0)
+    const emailField = globalFields.find(f =>
+      /^(interactions?|emails?|last\s*email|email\s*log)$/i.test(f.name?.trim())
+    ) || globalFields.find(f => /email|interaction/i.test(f.name));
+    console.log('[Affinity] emailField:', emailField ? `${emailField.name}(${emailField.id})` : 'not found');
+
+    if (emailField) {
+      const emailFVs = fieldValues.filter(fv => fv.field_id === emailField.id);
+      console.log('[Affinity] email FV count:', emailFVs.length);
+      result.emailsSent = emailFVs.length;
+      if (emailFVs.length > 0) {
+        const sorted = [...emailFVs].sort(
+          (a, b) => new Date(b.created_at || 0) - new Date(a.created_at || 0)
         );
-        result.lastEmailDate = sorted[0]?.date || sorted[0]?.created_at || null;
+        result.lastEmailDate = sorted[0]?.created_at || null;
       }
-    } catch (e2) { console.log('[Affinity] activity-logs error:', e2.response?.status, e2.message); }
-  }
+    }
+  } catch (e) { console.log('[Affinity] email field error:', e.message); }
 
   return result;
 }
