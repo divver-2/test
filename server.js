@@ -123,12 +123,26 @@ app.post('/api/launch', async (req, res) => {
   }
 });
 
-// Fetch all companies from Affinity sourcing list
+// Fetch company list from Affinity sourcing list (no per-company detail calls)
 app.get('/api/affinity/sourcing-companies', async (req, res) => {
   const affinityKey = req.headers['x-affinity-key'] || process.env.AFFINITY_API_KEY;
   if (!affinityKey) return res.status(400).json({ error: 'Affinity API key required — add it in Settings (⚙)' });
   try {
-    const result = await affinity.getSourcingListWithDetails(affinityKey);
+    const result = await affinity.getSourcingListCompanies(affinityKey);
+    res.json(result);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Fetch owner + last email for a single company (called per-row after list loads)
+app.get('/api/affinity/company-details', async (req, res) => {
+  const affinityKey = req.headers['x-affinity-key'] || process.env.AFFINITY_API_KEY;
+  if (!affinityKey) return res.status(400).json({ error: 'Affinity API key required' });
+  const { orgId } = req.query;
+  if (!orgId) return res.status(400).json({ error: 'orgId is required' });
+  try {
+    const result = await affinity.getCompanyDetails(orgId, affinityKey);
     res.json(result);
   } catch (err) {
     res.status(500).json({ error: err.message });

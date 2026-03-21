@@ -390,6 +390,59 @@ async function getSourcingListCompanies(apiKey) {
   return { list: { id: list.id, name: list.name }, companies };
 }
 
+// ── Get owner + last email for a single company ───────────────────────────────
+
+async function getCompanyDetails(orgId, apiKey) {
+  const client = getClient(apiKey);
+  let owner = null;
+  let lastEmailDate = null;
+  let emailsSent = 0;
+
+  const [globalFields, users] = await Promise.all([
+    getGlobalFields(apiKey),
+    getUsers(apiKey),
+  ]);
+
+  const ownerField = globalFields.find(f =>
+    f.name?.toLowerCase() === 'owner' ||
+    f.name?.toLowerCase().includes('global owner') ||
+    f.name?.toLowerCase().includes('owner')
+  );
+
+  try {
+    const fvRes = await client.get('/field-values', { params: { organization_id: orgId } });
+    const fieldValues = Array.isArray(fvRes.data) ? fvRes.data : [];
+    if (ownerField) {
+      const ownerFV = fieldValues.find(fv => fv.field_id === ownerField.id);
+      const raw = ownerFV?.value;
+      if (raw != null) {
+        if (typeof raw === 'object') {
+          owner = raw.name || `${raw.first_name || ''} ${raw.last_name || ''}`.trim() || null;
+        } else {
+          const user = users.find(u => u.id === raw);
+          owner = user ? `${user.first_name || ''} ${user.last_name || ''}`.trim() : null;
+        }
+      }
+    }
+  } catch { /* ok */ }
+
+  try {
+    const intRes = await client.get('/interactions', {
+      params: { organization_id: orgId, type: 'email' },
+    });
+    const interactions = intRes.data?.interactions || (Array.isArray(intRes.data) ? intRes.data : []);
+    emailsSent = interactions.length;
+    if (interactions.length > 0) {
+      const sorted = [...interactions].sort(
+        (a, b) => new Date(b.date || b.created_at || 0) - new Date(a.date || a.created_at || 0)
+      );
+      lastEmailDate = sorted[0]?.date || sorted[0]?.created_at || null;
+    }
+  } catch { /* ok */ }
+
+  return { owner, lastEmailDate, emailsSent };
+}
+
 // ── Get sourcing list companies with owner + last email data ──────────────────
 
 async function getSourcingListWithDetails(apiKey) {
@@ -470,4 +523,5 @@ module.exports = {
   setGlobalOwner,
   getSourcingListCompanies,
   getSourcingListWithDetails,
+  getCompanyDetails,
 };

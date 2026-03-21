@@ -837,12 +837,44 @@ async function loadSourcingList() {
 
     clearStatus();
     renderSourcingList(data);
+    // Load owner + email details per row after list is visible
+    enrichRowsSequentially(data.companies);
   } catch (e) {
     setStatus('Error: ' + e.message, 'error');
   } finally {
     btn.disabled = false;
     btn.textContent = 'Load Affinity List';
   }
+}
+
+async function enrichRowsSequentially(companies) {
+  for (let i = 0; i < companies.length; i++) {
+    const company = companies[i];
+    try {
+      const res = await fetch(`/api/affinity/company-details?orgId=${company.id}`, {
+        headers: { 'x-affinity-key': getAffinityKey() },
+      });
+      if (!res.ok) continue;
+      const details = await res.json();
+      updateSourcingRow(i, details);
+    } catch { /* skip row on error */ }
+    // 300ms pause between calls to avoid rate limiting
+    await new Promise(r => setTimeout(r, 300));
+  }
+}
+
+function updateSourcingRow(idx, { owner, lastEmailDate }) {
+  const rows = document.querySelectorAll('.sourcing-row');
+  const row = rows[idx];
+  if (!row) return;
+
+  const isFree = !owner && !lastEmailDate;
+  row.querySelector('.sourcing-col-owner').textContent = owner || '—';
+  row.querySelector('.sourcing-col-owner').style.color = owner ? 'var(--text)' : 'var(--muted)';
+  row.querySelector('.sourcing-col-email').textContent = lastEmailDate ? fmtDate(lastEmailDate) : 'Never';
+  row.querySelector('.sourcing-col-email').style.color = lastEmailDate ? 'var(--text)' : 'var(--muted)';
+  const badgeEl = row.querySelector('.sourcing-col-badge');
+  badgeEl.innerHTML = isFree ? '<span class="free-badge" title="No owner, no emails sent — free to contact">✓</span>' : '';
 }
 
 function renderSourcingList({ list, companies }) {
@@ -862,26 +894,17 @@ function renderSourcingList({ list, companies }) {
         <span></span>
         <span></span>
       </div>`;
-    const rows = companies.map((c, i) => {
-      const isFree = !c.owner && !c.lastEmailDate;
-      return `
-        <div class="sourcing-row">
-          <div>
-            <div class="sourcing-row-name">${esc(c.name)}</div>
-            <div class="sourcing-row-domain">${esc(c.domain || '—')}</div>
-          </div>
-          <div class="sourcing-col" style="color:${c.owner ? 'var(--text)' : 'var(--muted)'}">
-            ${c.owner ? esc(c.owner) : '—'}
-          </div>
-          <div class="sourcing-col" style="color:${c.lastEmailDate ? 'var(--text)' : 'var(--muted)'}">
-            ${c.lastEmailDate ? fmtDate(c.lastEmailDate) : 'Never'}
-          </div>
-          <div>
-            ${isFree ? '<span class="free-badge" title="No owner, no emails sent — free to contact">✓</span>' : ''}
-          </div>
-          <button class="sourcing-row-btn" onclick="enrichFromAffinity(${i})">Enrich →</button>
-        </div>`;
-    }).join('');
+    const rows = companies.map((c, i) => `
+      <div class="sourcing-row">
+        <div>
+          <div class="sourcing-row-name">${esc(c.name)}</div>
+          <div class="sourcing-row-domain">${esc(c.domain || '—')}</div>
+        </div>
+        <div class="sourcing-col sourcing-col-owner" style="color:var(--muted)">…</div>
+        <div class="sourcing-col sourcing-col-email" style="color:var(--muted)">…</div>
+        <div class="sourcing-col-badge"></div>
+        <button class="sourcing-row-btn" onclick="enrichFromAffinity(${i})">Enrich →</button>
+      </div>`).join('');
     rowsEl.innerHTML = header + rows;
   }
 
