@@ -116,6 +116,7 @@ const KNOWN_USERS = {
   100285871: 'Chetan Chaudhary',
   173877398: 'Cormac Dunn',
   182265366: 'Nazanin Soltan',
+  199216885: 'Ed Peterson',
 };
 
 async function resolveOwnerValue(raw, apiKey, cachedUsers) {
