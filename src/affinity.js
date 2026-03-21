@@ -78,15 +78,23 @@ async function getUsers(apiKey) {
   const client = getClient(apiKey);
   try {
     const res = await client.get('/users');
+    console.log('[Affinity] /users raw:', JSON.stringify(res.data)?.slice(0, 200));
     // Affinity v1 returns an array directly or { users: [...] }
     if (Array.isArray(res.data)) return res.data;
     if (Array.isArray(res.data?.users)) return res.data.users;
     return [];
-  } catch {
+  } catch (e) {
+    console.log('[Affinity] /users error:', e.response?.status, e.message);
     try {
       const me = await getClient(apiKey).get('/auth/whoami');
-      return me.data ? [me.data] : [];
-    } catch { return []; }
+      console.log('[Affinity] /auth/whoami raw:', JSON.stringify(me.data)?.slice(0, 200));
+      // Affinity whoami returns { user: {...} } or a bare user object
+      const user = me.data?.user || me.data;
+      return user ? [user] : [];
+    } catch (e2) {
+      console.log('[Affinity] /auth/whoami error:', e2.response?.status, e2.message);
+      return [];
+    }
   }
 }
 
@@ -362,7 +370,7 @@ async function lookupCompanyInAffinity(companyName, apiKey, domain) {
   // ── Last email sent (via interactions) ────────────────────────────────────
   try {
     const intRes = await client.get('/interactions', {
-      params: { organization_id: org.id },
+      params: { 'organization_ids[]': org.id },
     });
     console.log('[Affinity] interactions raw keys:', Object.keys(intRes.data || {}));
     const logs = intRes.data?.email_interactions
@@ -383,7 +391,7 @@ async function lookupCompanyInAffinity(companyName, apiKey, domain) {
     console.log('[Affinity] interactions error:', e.response?.status, e.message);
     // Fallback: try activity-logs without type filter
     try {
-      const intRes2 = await client.get('/activity-logs', { params: { organization_id: org.id } });
+      const intRes2 = await client.get('/activity-logs', { params: { 'organization_ids[]': org.id } });
       console.log('[Affinity] activity-logs raw keys:', Object.keys(intRes2.data || {}));
       const logs2 = intRes2.data?.activity_logs || intRes2.data?.interactions || (Array.isArray(intRes2.data) ? intRes2.data : []);
       result.emailsSent = logs2.length;
@@ -463,10 +471,11 @@ async function getCompanyDetails(orgId, apiKey) {
   } catch { /* ok */ }
 
   try {
-    const intRes = await client.get('/activity-logs', {
-      params: { organization_id: orgId, type: 'email' },
+    const intRes = await client.get('/interactions', {
+      params: { 'organization_ids[]': orgId },
     });
-    const interactions = intRes.data?.activity_logs || intRes.data?.interactions || (Array.isArray(intRes.data) ? intRes.data : []);
+    const interactions = intRes.data?.interactions || intRes.data?.email_interactions
+      || intRes.data?.activity_logs || (Array.isArray(intRes.data) ? intRes.data : []);
     emailsSent = interactions.length;
     if (interactions.length > 0) {
       const sorted = [...interactions].sort(
@@ -521,10 +530,11 @@ async function getSourcingListWithDetails(apiKey) {
       } catch { /* ok */ }
 
       try {
-        const intRes = await client.get('/activity-logs', {
-          params: { organization_id: company.id, type: 'email' },
+        const intRes = await client.get('/interactions', {
+          params: { 'organization_ids[]': company.id },
         });
-        const interactions = intRes.data?.activity_logs || intRes.data?.interactions || (Array.isArray(intRes.data) ? intRes.data : []);
+        const interactions = intRes.data?.interactions || intRes.data?.email_interactions
+          || intRes.data?.activity_logs || (Array.isArray(intRes.data) ? intRes.data : []);
         emailsSent = interactions.length;
         if (interactions.length > 0) {
           const sorted = [...interactions].sort(
