@@ -337,7 +337,7 @@ async function runOutreachByCompany({ companyName, apiKey, affinityKey }) {
   const usedAffinityKey = affinityKey || process.env.AFFINITY_API_KEY;
   if (usedAffinityKey) {
     try {
-      results.affinityData = await affinity.lookupCompanyInAffinity(companyName, usedAffinityKey, domain);
+      results.affinityData = await affinity.lookupCompanyInAffinity(companyName, usedAffinityKey, domain, ceoEmail);
     } catch (e) {
       results.errors.push(`Affinity lookup failed: ${e.message}`);
     }

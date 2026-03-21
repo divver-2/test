@@ -336,7 +336,7 @@ async function setGlobalOwner(orgId, ownerName, apiKey) {
 
 // ── Lookup company: owner + email history (read-only) ─────────────────────────
 
-async function lookupCompanyInAffinity(companyName, apiKey, domain) {
+async function lookupCompanyInAffinity(companyName, apiKey, domain, ceoEmail) {
   const client = getClient(apiKey);
 
   // Try by name first, fall back to domain search
@@ -385,31 +385,50 @@ async function lookupCompanyInAffinity(companyName, apiKey, domain) {
   console.log('[Affinity] resolved owner:', result.owner);
 
   // ── Last contacted ─────────────────────────────────────────────────────────
-  result.lastEmailDate = await getLastContacted(org.id, client);
+  result.lastEmailDate = await getLastContacted(org.id, client, ceoEmail);
 
   return result;
 }
 
 // ── Last contacted ────────────────────────────────────────────────────────────
 
-// Read last_contacted_at directly from the organization object — fast and reliable
-async function getLastContacted(orgId, client) {
+function _latestTs(items, ...fields) {
+  return items.reduce((best, item) => {
+    const ts = fields.map(f => item[f]).find(Boolean) || null;
+    if (!ts) return best;
+    return !best || new Date(ts) > new Date(best) ? ts : best;
+  }, null);
+}
+
+// Hierarchy: org notes → CEO person last_contacted_at → null
+async function getLastContacted(orgId, client, ceoEmail) {
+  // 1. Org notes
   try {
     const res = await client.get('/notes', { params: { organization_id: orgId, page_size: 50 } });
     const notes = Array.isArray(res.data) ? res.data : (res.data?.notes || []);
-    console.log('[Affinity] notes count for org', orgId, ':', notes.length);
-    if (!notes.length) return null;
-    const latest = notes.reduce((best, n) => {
-      const ts = n.created_at || n.updated_at || null;
-      if (!ts) return best;
-      return !best || new Date(ts) > new Date(best) ? ts : best;
-    }, null);
-    console.log('[Affinity] last_contacted_at (via notes):', latest);
-    return latest;
+    console.log('[Affinity] notes count:', notes.length);
+    const ts = _latestTs(notes, 'created_at', 'updated_at');
+    if (ts) { console.log('[Affinity] last contacted (notes):', ts); return ts; }
   } catch (e) {
-    console.log('[Affinity] getLastContacted error:', e.response?.status, e.message);
-    return null;
+    console.log('[Affinity] notes error:', e.response?.status, e.message);
   }
+
+  // 2. CEO person's last_contacted_at
+  if (ceoEmail) {
+    try {
+      const res = await client.get('/persons', { params: { email: ceoEmail } });
+      const people = Array.isArray(res.data) ? res.data : (res.data?.persons || []);
+      const person = people[0] || null;
+      console.log('[Affinity] person lookup for', ceoEmail, '→', person ? `id ${person.id}` : 'not found');
+      const ts = person?.last_contacted_at || null;
+      if (ts) { console.log('[Affinity] last contacted (person):', ts); return ts; }
+    } catch (e) {
+      console.log('[Affinity] person lookup error:', e.response?.status, e.message);
+    }
+  }
+
+  console.log('[Affinity] last contacted: no data found');
+  return null;
 }
 
 // ── Get all companies from the sourcing list ───────────────────────────────────
