@@ -396,8 +396,18 @@ async function lookupCompanyInAffinity(companyName, apiKey, domain) {
 async function getLastContacted(orgId, client) {
   try {
     const res = await client.get(`/organizations/${orgId}`);
-    const ts = res.data?.last_contacted_at || null;
-    console.log('[Affinity] last_contacted_at:', ts);
+    const org = res.data;
+    // Log all top-level keys + any date-shaped values to find the right field
+    const dateFields = Object.entries(org || {})
+      .filter(([, v]) => typeof v === 'string' && /\d{4}-\d{2}-\d{2}/.test(v))
+      .reduce((acc, [k, v]) => ({ ...acc, [k]: v }), {});
+    console.log('[Affinity] org date fields:', JSON.stringify(dateFields));
+    const ts = org?.last_contacted_at
+      || org?.last_interaction_at
+      || org?.last_activity_at
+      || org?.updated_at
+      || null;
+    console.log('[Affinity] last_contacted_at resolved:', ts);
     return ts;
   } catch (e) {
     console.log('[Affinity] getLastContacted error:', e.response?.status, e.message);
