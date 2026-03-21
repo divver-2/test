@@ -375,8 +375,8 @@
         <input type="password" id="apolloKeyInput" placeholder="Paste your Apollo API key…" autocomplete="off" />
       </div>
       <div class="field">
-        <label>Hunter.io API Key <span style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--muted)">(free — used for company & CEO lookup)</span></label>
-        <input type="password" id="hunterKeyInput" placeholder="Paste your Hunter.io API key…" autocomplete="off" />
+        <label>Affinity API Key</label>
+        <input type="password" id="affinityKeyInput" placeholder="Paste your Affinity API key…" autocomplete="off" />
       </div>
     </div>
     <div style="display:flex;gap:8px;margin-top:12px">
@@ -558,7 +558,7 @@ async function addCompany() {
     const res = await fetch('/api/company', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ companyName, apiKey, hunterKey: getHunterKey() }),
+      body: JSON.stringify({ companyName, apiKey }),
     });
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || 'Lookup failed');
@@ -595,8 +595,8 @@ async function addCompany() {
 }
 
 // ── Settings / API keys ───────────────────────────────────
-function getApiKey()    { return localStorage.getItem('apollo_api_key') || ''; }
-function getHunterKey() { return localStorage.getItem('hunter_api_key') || ''; }
+function getApiKey()      { return localStorage.getItem('apollo_api_key') || ''; }
+function getAffinityKey() { return localStorage.getItem('affinity_api_key') || ''; }
 
 function toggleSettings() {
   const panel = document.getElementById('settingsPanel');
@@ -608,18 +608,18 @@ function toggleSettings() {
     panel.classList.remove('hidden');
     requestAnimationFrame(() => requestAnimationFrame(() => panel.classList.add('open')));
     document.getElementById('apolloKeyInput').value = getApiKey();
-    document.getElementById('hunterKeyInput').value = getHunterKey();
+    document.getElementById('affinityKeyInput').value = getAffinityKey();
     setTimeout(() => document.getElementById('apolloKeyInput').focus(), 300);
   }
 }
 
 function saveSettings() {
   const apolloKey = document.getElementById('apolloKeyInput').value.trim();
-  const hunterKey = document.getElementById('hunterKeyInput').value.trim();
+  const affinityKey = document.getElementById('affinityKeyInput').value.trim();
   if (apolloKey) localStorage.setItem('apollo_api_key', apolloKey);
   else localStorage.removeItem('apollo_api_key');
-  if (hunterKey) localStorage.setItem('hunter_api_key', hunterKey);
-  else localStorage.removeItem('hunter_api_key');
+  if (affinityKey) localStorage.setItem('affinity_api_key', affinityKey);
+  else localStorage.removeItem('affinity_api_key');
   updatePill(!!apolloKey);
   document.getElementById('settingsPanel').classList.remove('open');
   setStatus('Settings saved.', 'loading');
@@ -829,7 +829,9 @@ async function loadSourcingList() {
   setStatus('Fetching Affinity sourcing list…', 'loading');
 
   try {
-    const res = await fetch('/api/affinity/sourcing-companies');
+    const res = await fetch('/api/affinity/sourcing-companies', {
+      headers: { 'x-affinity-key': getAffinityKey() },
+    });
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || 'Failed to load sourcing list');
 

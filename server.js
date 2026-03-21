@@ -125,8 +125,8 @@ app.post('/api/launch', async (req, res) => {
 
 // Fetch all companies from Affinity sourcing list
 app.get('/api/affinity/sourcing-companies', async (req, res) => {
-  const affinityKey = process.env.AFFINITY_API_KEY;
-  if (!affinityKey) return res.status(400).json({ error: 'AFFINITY_API_KEY not set in .env' });
+  const affinityKey = req.headers['x-affinity-key'] || process.env.AFFINITY_API_KEY;
+  if (!affinityKey) return res.status(400).json({ error: 'Affinity API key required — add it in Settings (⚙)' });
   try {
     const result = await affinity.getSourcingListWithDetails(affinityKey);
     res.json(result);
