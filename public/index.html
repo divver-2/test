@@ -307,6 +307,24 @@
     }
     .btn-mailto:hover { border-color: var(--accent); color: var(--accent-hover); }
 
+    /* ── Sourcing list rows ── */
+    .sourcing-row {
+      display: flex; align-items: center; gap: 12px;
+      padding: 12px 24px; border-bottom: 1px solid rgba(37,42,74,0.6);
+      transition: background 0.1s; cursor: pointer;
+    }
+    .sourcing-row:last-child { border-bottom: none; }
+    .sourcing-row:hover { background: rgba(99,102,241,0.05); }
+    .sourcing-row-name { font-weight: 600; font-size: 0.9rem; flex: 1; }
+    .sourcing-row-domain { font-size: 0.775rem; color: var(--muted); }
+    .sourcing-row-btn {
+      padding: 5px 14px; border-radius: 6px; border: 1px solid var(--border);
+      background: var(--surface2); color: var(--text); font-size: 0.8rem;
+      font-weight: 600; cursor: pointer; white-space: nowrap; transition: all 0.15s;
+      flex-shrink: 0;
+    }
+    .sourcing-row-btn:hover { border-color: var(--accent); color: var(--accent-hover); }
+
     .hidden { display: none !important; }
 
     @media (max-width: 620px) {
@@ -363,7 +381,20 @@
         <input type="text" id="companyInput" placeholder="e.g. stripe.com, hubspot.com…" autocomplete="off" />
       </div>
       <button class="btn btn-primary" id="addBtn" onclick="addCompany()">Look Up</button>
+      <button class="btn" id="affinityLoadBtn" onclick="loadSourcingList()" style="background:var(--surface2);border:1px solid var(--border);color:var(--text)">Load Affinity List</button>
     </div>
+  </div>
+
+  <!-- Affinity sourcing list panel -->
+  <div class="result-card hidden" id="sourcingPanel">
+    <div style="padding:18px 24px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between">
+      <div>
+        <span style="font-size:0.7rem;text-transform:uppercase;letter-spacing:0.08em;color:var(--muted);font-weight:600">Affinity Sourcing List</span>
+        <span id="sourcingListName" style="color:var(--muted);font-size:0.8rem;margin-left:8px"></span>
+      </div>
+      <span id="sourcingCount" class="count-pill"></span>
+    </div>
+    <div id="sourcingRows" style="max-height:320px;overflow-y:auto"></div>
   </div>
 
   <!-- Status -->
@@ -772,6 +803,66 @@ async function markConnected(historyIdx) {
     btn.textContent = 'Mark Connected';
     alert('Could not update Affinity: ' + e.message);
   }
+}
+
+// ── Affinity sourcing list ────────────────────────────────
+async function loadSourcingList() {
+  const btn = document.getElementById('affinityLoadBtn');
+  btn.disabled = true;
+  btn.textContent = 'Loading…';
+  setStatus('Fetching Affinity sourcing list…', 'loading');
+
+  try {
+    const res = await fetch('/api/affinity/sourcing-companies');
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Failed to load sourcing list');
+
+    clearStatus();
+    renderSourcingList(data);
+  } catch (e) {
+    setStatus('Error: ' + e.message, 'error');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Load Affinity List';
+  }
+}
+
+function renderSourcingList({ list, companies }) {
+  const panel = document.getElementById('sourcingPanel');
+  document.getElementById('sourcingListName').textContent = list?.name ? `— ${list.name}` : '';
+  document.getElementById('sourcingCount').textContent = `${companies.length} compan${companies.length === 1 ? 'y' : 'ies'}`;
+
+  document.getElementById('sourcingRows').innerHTML = companies.length
+    ? companies.map((c, i) => `
+        <div class="sourcing-row">
+          <div style="flex:1">
+            <div class="sourcing-row-name">${esc(c.name)}</div>
+            <div class="sourcing-row-domain">${esc(c.domain || 'no domain')}</div>
+          </div>
+          <button class="sourcing-row-btn" onclick="enrichFromAffinity(${i})" data-idx="${i}">Enrich →</button>
+        </div>
+      `).join('')
+    : '<div class="empty"><span>📋</span>No companies found in sourcing list.</div>';
+
+  // Store for click handler
+  panel._companies = companies;
+  panel.classList.remove('hidden');
+}
+
+async function enrichFromAffinity(idx) {
+  const panel = document.getElementById('sourcingPanel');
+  const company = panel._companies?.[idx];
+  if (!company) return;
+
+  const domain = company.domain || company.name;
+  document.getElementById('companyInput').value = domain;
+
+  // Highlight the selected row
+  document.querySelectorAll('.sourcing-row').forEach((r, i) => {
+    r.style.background = i === idx ? 'rgba(99,102,241,0.1)' : '';
+  });
+
+  addCompany();
 }
 
 // ── Init ──────────────────────────────────────────────────

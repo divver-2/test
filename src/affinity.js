@@ -357,6 +357,41 @@ async function lookupCompanyInAffinity(companyName, apiKey) {
   return result;
 }
 
+// ── Get all companies from the sourcing list ───────────────────────────────────
+
+async function getSourcingListCompanies(apiKey) {
+  const list = await getSourcingList(apiKey);
+  if (!list) throw new Error('No sourcing list found in Affinity');
+
+  const client = getClient(apiKey);
+  let allEntries = [];
+  let page = 1;
+
+  // Paginate through all entries
+  while (true) {
+    const res = await client.get('/list-entries', {
+      params: { list_id: list.id, page_size: 100, page },
+    });
+    const entries = Array.isArray(res.data)
+      ? res.data
+      : (res.data?.list_entries || []);
+    allEntries = allEntries.concat(entries);
+    if (entries.length < 100) break;
+    page++;
+  }
+
+  const companies = allEntries
+    .filter(e => e.entity && e.entity.name)
+    .map(e => ({
+      id: e.entity.id,
+      name: e.entity.name,
+      domain: e.entity.domain_names?.[0] || null,
+      listEntryId: e.id,
+    }));
+
+  return { list: { id: list.id, name: list.name }, companies };
+}
+
 module.exports = {
   upsertOrganization,
   upsertPerson,
@@ -364,4 +399,5 @@ module.exports = {
   markConnected,
   lookupCompanyInAffinity,
   setGlobalOwner,
+  getSourcingListCompanies,
 };

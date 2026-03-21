@@ -123,6 +123,18 @@ app.post('/api/launch', async (req, res) => {
   }
 });
 
+// Fetch all companies from Affinity sourcing list
+app.get('/api/affinity/sourcing-companies', async (req, res) => {
+  const affinityKey = process.env.AFFINITY_API_KEY;
+  if (!affinityKey) return res.status(400).json({ error: 'AFFINITY_API_KEY not set in .env' });
+  try {
+    const result = await affinity.getSourcingListCompanies(affinityKey);
+    res.json(result);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // Mark a company as Connected in Affinity
 app.post('/api/affinity/mark-connected', async (req, res) => {
   const { priorityFieldValueId, connectedOptionId } = req.body;
