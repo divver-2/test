@@ -1,5 +1,6 @@
 const apollo = require('./apollo');
 const affinity = require('./affinity');
+const hunter = require('./hunter');
 const { buildEmailSequence, FOLLOWUP_DELAY_DAYS } = require('./emailGenerator');
 
 const SEQUENCE_NAME_PREFIX = 'CEO Outreach —';
@@ -201,8 +202,8 @@ async function runOutreachSequence({ email, senderName, apiKey }) {
 }
 
 // Enrich company by name/domain: get CEO + company info from Apollo, owner + emails from Affinity
-async function runOutreachByCompany({ companyName, apiKey }) {
-  const results = { organization: null, ceo: null, affinityData: null, errors: [] };
+async function runOutreachByCompany({ companyName, apiKey, hunterKey }) {
+  const results = { organization: null, ceo: null, affinityData: null, errors: [], usedHunter: false };
 
   // 1. If input looks like a domain, use it directly
   const looksLikeDomain = companyName.includes('.') && !companyName.includes(' ');
@@ -222,12 +223,18 @@ async function runOutreachByCompany({ companyName, apiKey }) {
         console.log('[Step 1] No company found');
       }
     } catch (e) {
-      console.error('[Step 1] FAILED:', e.response?.status, e.response?.data || e.message);
-      results.errors.push(`Company search failed: ${e.response?.data?.message || e.message}`);
+      const status = e.response?.status;
+      if (status === 403 && !domain) {
+        // Apollo search unavailable and we have no domain — nothing more to try
+        console.log('[Step 1] Apollo search not available on this plan');
+      } else {
+        console.error('[Step 1] FAILED:', status, e.response?.data || e.message);
+        results.errors.push(`Company search failed: ${e.response?.data?.message || e.message}`);
+      }
     }
   }
 
-  // 2. Enrich org for full details
+  // 2. Enrich org for full details via Apollo; fall back to Hunter.io
   if (domain) {
     try {
       console.log('[Step 2] Enriching org for domain:', domain);
@@ -235,15 +242,30 @@ async function runOutreachByCompany({ companyName, apiKey }) {
       if (enriched) results.organization = enriched;
       console.log('[Step 2] Done');
     } catch (e) {
-      console.error('[Step 2] FAILED:', e.response?.status, e.response?.data || e.message);
-      results.errors.push(`Organization enrichment failed: ${e.response?.data?.message || e.message}`);
+      const status = e.response?.status;
+      if (status === 403 && hunterKey) {
+        console.log('[Step 2] Apollo not available, trying Hunter.io');
+        try {
+          const hunterData = await hunter.lookupDomain(domain, hunterKey);
+          if (hunterData.company) results.organization = hunterData.company;
+          if (hunterData.ceo) results.ceo = hunterData.ceo;
+          results.usedHunter = true;
+          console.log('[Step 2] Hunter.io done:', results.organization?.name, '| CEO:', results.ceo?.first_name, results.ceo?.last_name);
+        } catch (he) {
+          console.error('[Step 2] Hunter.io FAILED:', he.response?.data || he.message);
+          results.errors.push(`Hunter.io lookup failed: ${he.message}`);
+        }
+      } else {
+        console.error('[Step 2] FAILED:', status, e.response?.data || e.message);
+        results.errors.push(`Organization enrichment failed: ${e.response?.data?.message || e.message}`);
+      }
     }
   }
 
   const orgName = results.organization?.name || companyName;
 
-  // 3. Find CEO by domain, then enrich by name+domain for email
-  if (domain) {
+  // 3. Find CEO via Apollo (skip if Hunter already found one)
+  if (domain && !results.ceo) {
     try {
       console.log('[Step 3] Finding CEO for domain:', domain);
       const ceoBasic = await apollo.findCEO(domain, apiKey);
@@ -258,8 +280,23 @@ async function runOutreachByCompany({ companyName, apiKey }) {
       }
       console.log('[Step 3] Done');
     } catch (e) {
-      console.error('[Step 3] FAILED:', e.response?.status, e.response?.data || e.message);
-      results.errors.push(`CEO lookup failed: ${e.response?.data?.message || e.message}`);
+      const status = e.response?.status;
+      if (status === 403 && hunterKey && !results.usedHunter) {
+        console.log('[Step 3] Apollo not available, trying Hunter.io for CEO');
+        try {
+          const hunterData = await hunter.lookupDomain(domain, hunterKey);
+          if (hunterData.company && !results.organization) results.organization = hunterData.company;
+          if (hunterData.ceo) results.ceo = hunterData.ceo;
+          results.usedHunter = true;
+          console.log('[Step 3] Hunter.io CEO:', results.ceo?.first_name, results.ceo?.last_name);
+        } catch (he) {
+          console.error('[Step 3] Hunter.io FAILED:', he.response?.data || he.message);
+          results.errors.push(`CEO lookup failed (Hunter.io): ${he.message}`);
+        }
+      } else if (status !== 403) {
+        console.error('[Step 3] FAILED:', status, e.response?.data || e.message);
+        results.errors.push(`CEO lookup failed: ${e.response?.data?.message || e.message}`);
+      }
     }
   }
 

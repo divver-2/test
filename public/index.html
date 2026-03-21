@@ -335,15 +335,21 @@
 <div class="settings-panel hidden" id="settingsPanel">
   <div class="settings-inner">
     <div class="settings-title">Settings</div>
-    <div class="field">
-      <label>Apollo API Key</label>
-      <input type="password" id="apolloKeyInput" placeholder="Paste your Apollo API key…" autocomplete="off" />
+    <div style="display:flex;flex-direction:column;gap:12px">
+      <div class="field">
+        <label>Apollo API Key</label>
+        <input type="password" id="apolloKeyInput" placeholder="Paste your Apollo API key…" autocomplete="off" />
+      </div>
+      <div class="field">
+        <label>Hunter.io API Key <span style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--muted)">(free — used for company & CEO lookup)</span></label>
+        <input type="password" id="hunterKeyInput" placeholder="Paste your Hunter.io API key…" autocomplete="off" />
+      </div>
     </div>
     <div style="display:flex;gap:8px;margin-top:12px">
       <button class="btn btn-primary" onclick="saveSettings()">Save</button>
       <button class="btn" onclick="toggleSettings()">Cancel</button>
     </div>
-    <div style="font-size:0.77rem;color:var(--muted);margin-top:10px">Key is stored in your browser only, never sent to any server except Apollo.</div>
+    <div style="font-size:0.77rem;color:var(--muted);margin-top:10px">Keys are stored in your browser only.</div>
   </div>
 </div>
 
@@ -505,7 +511,7 @@ async function addCompany() {
     const res = await fetch('/api/company', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ companyName, apiKey }),
+      body: JSON.stringify({ companyName, apiKey, hunterKey: getHunterKey() }),
     });
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || 'Lookup failed');
@@ -541,8 +547,9 @@ async function addCompany() {
   }
 }
 
-// ── Settings / API key ────────────────────────────────────
-function getApiKey() { return localStorage.getItem('apollo_api_key') || ''; }
+// ── Settings / API keys ───────────────────────────────────
+function getApiKey()    { return localStorage.getItem('apollo_api_key') || ''; }
+function getHunterKey() { return localStorage.getItem('hunter_api_key') || ''; }
 
 function toggleSettings() {
   const panel = document.getElementById('settingsPanel');
@@ -554,21 +561,22 @@ function toggleSettings() {
     panel.classList.remove('hidden');
     requestAnimationFrame(() => requestAnimationFrame(() => panel.classList.add('open')));
     document.getElementById('apolloKeyInput').value = getApiKey();
+    document.getElementById('hunterKeyInput').value = getHunterKey();
     setTimeout(() => document.getElementById('apolloKeyInput').focus(), 300);
   }
 }
 
 function saveSettings() {
-  const key = document.getElementById('apolloKeyInput').value.trim();
-  if (key) {
-    localStorage.setItem('apollo_api_key', key);
-    updatePill(true);
-  } else {
-    localStorage.removeItem('apollo_api_key');
-    updatePill(false);
-  }
+  const apolloKey = document.getElementById('apolloKeyInput').value.trim();
+  const hunterKey = document.getElementById('hunterKeyInput').value.trim();
+  if (apolloKey) localStorage.setItem('apollo_api_key', apolloKey);
+  else localStorage.removeItem('apollo_api_key');
+  if (hunterKey) localStorage.setItem('hunter_api_key', hunterKey);
+  else localStorage.removeItem('hunter_api_key');
+  updatePill(!!apolloKey);
   document.getElementById('settingsPanel').classList.remove('open');
-  setStatus(key ? 'Apollo API key saved.' : 'Apollo API key cleared.', key ? 'success' : 'error');
+  setStatus('Settings saved.', 'loading');
+  setTimeout(clearStatus, 1500);
 }
 
 function updatePill(hasKey) {

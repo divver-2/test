@@ -20,8 +20,10 @@ app.post('/api/company', async (req, res) => {
   const apiKey = bodyKey || process.env.APOLLO_API_KEY;
   if (!apiKey) return res.status(400).json({ error: 'Apollo API key is required — enter it in Settings' });
 
+  const hunterKey = req.body.hunterKey || process.env.HUNTER_API_KEY;
+
   try {
-    const result = await runOutreachByCompany({ companyName, apiKey });
+    const result = await runOutreachByCompany({ companyName, apiKey, hunterKey });
     res.json(result);
   } catch (err) {
     console.error('[/api/company] Error:', err.message);
