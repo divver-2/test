@@ -112,7 +112,7 @@ function userName(u) {
 const KNOWN_USERS = {
   16057750: 'Ankit Sud',
   87482981: 'David Divver',
-  100285871: null, // unknown — update when identified
+  100285871: 'Chetan Chaudhary',
 };
 
 async function resolveOwnerValue(raw, apiKey, cachedUsers) {
