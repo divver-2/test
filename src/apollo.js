@@ -278,7 +278,16 @@ async function getCompanyEmailActivity(domain, apiKey) {
   const contacts = res.data.contacts || [];
   const contacted = contacts.filter(c => c.last_activity_date);
   const emailsSent = contacts.reduce((sum, c) => sum + (c.num_contacted || 0), 0);
-  const lastEmailDate = contacted[0]?.last_activity_date || null;
+  const rawDate = contacted[0]?.last_activity_date || null;
+  // Normalize: Unix seconds → ISO string; ISO strings pass through
+  let lastEmailDate = null;
+  if (rawDate) {
+    if (typeof rawDate === 'number') {
+      lastEmailDate = new Date(rawDate < 1e12 ? rawDate * 1000 : rawDate).toISOString();
+    } else {
+      lastEmailDate = rawDate;
+    }
+  }
   return { emailsSent, lastEmailDate };
 }
 

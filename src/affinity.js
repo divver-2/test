@@ -90,6 +90,26 @@ async function getUsers(apiKey) {
   }
 }
 
+// Resolve a raw owner value (user ID or object) to a display name
+async function resolveOwnerValue(raw, apiKey, cachedUsers) {
+  if (!raw) return null;
+  if (typeof raw === 'object') {
+    return raw.name || `${raw.first_name || ''} ${raw.last_name || ''}`.trim() || null;
+  }
+  // raw is a user ID — search cached list first (use == for type safety)
+  const users = cachedUsers || await getUsers(apiKey);
+  // eslint-disable-next-line eqeqeq
+  const user = users.find(u => u.id == raw);
+  if (user) return `${user.first_name || ''} ${user.last_name || ''}`.trim() || null;
+  // Last resort: fetch the specific user by ID
+  try {
+    const res = await getClient(apiKey).get(`/users/${raw}`);
+    const u = res.data;
+    if (u) return `${u.first_name || ''} ${u.last_name || ''}`.trim() || null;
+  } catch { /* ignore */ }
+  return null;
+}
+
 // Find user whose name matches (fuzzy)
 async function findUserByName(name, apiKey) {
   if (!name) return null;
@@ -324,14 +344,8 @@ async function lookupCompanyInAffinity(companyName, apiKey, domain) {
       // Use the most recently created one
       const ownerFV = ownerFVs.sort((a, b) => new Date(b.created_at) - new Date(a.created_at))[0];
       if (ownerFV) {
-        const raw = ownerFV.value;
-        if (typeof raw === 'object' && raw !== null) {
-          result.owner = raw.name || `${raw.first_name || ''} ${raw.last_name || ''}`.trim() || null;
-        } else {
-          const users = await getUsers(apiKey);
-          const user = users.find(u => u.id === raw);
-          result.owner = user ? `${user.first_name || ''} ${user.last_name || ''}`.trim() : String(raw);
-        }
+        const users = await getUsers(apiKey);
+        result.owner = await resolveOwnerValue(ownerFV.value, apiKey, users);
       }
     }
   } catch (e) { console.log('[Affinity] owner error:', e.response?.status, e.message); }
@@ -399,14 +413,8 @@ async function getCompanyDetails(orgId, apiKey) {
     const fieldValues = Array.isArray(fvRes.data) ? fvRes.data : [];
     if (ownerField) {
       const ownerFV = fieldValues.find(fv => fv.field_id === ownerField.id);
-      const raw = ownerFV?.value;
-      if (raw != null) {
-        if (typeof raw === 'object') {
-          owner = raw.name || `${raw.first_name || ''} ${raw.last_name || ''}`.trim() || null;
-        } else {
-          const user = users.find(u => u.id === raw);
-          owner = user ? `${user.first_name || ''} ${user.last_name || ''}`.trim() : null;
-        }
+      if (ownerFV?.value != null) {
+        owner = await resolveOwnerValue(ownerFV.value, apiKey, users);
       }
     }
   } catch { /* ok */ }
@@ -446,16 +454,6 @@ async function getSourcingListWithDetails(apiKey) {
     f.name?.toLowerCase().includes('owner')
   );
 
-  // Helper: resolve an owner field value to a display name
-  function resolveOwner(raw) {
-    if (!raw) return null;
-    if (typeof raw === 'object') {
-      return raw.name || `${raw.first_name || ''} ${raw.last_name || ''}`.trim() || null;
-    }
-    const user = users.find(u => u.id === raw);
-    return user ? `${user.first_name || ''} ${user.last_name || ''}`.trim() : null;
-  }
-
   // Enrich each company 5 at a time to avoid rate limits
   const BATCH = 5;
   const enriched = [];
@@ -473,7 +471,9 @@ async function getSourcingListWithDetails(apiKey) {
         const fieldValues = Array.isArray(fvRes.data) ? fvRes.data : [];
         if (ownerField) {
           const ownerFV = fieldValues.find(fv => fv.field_id === ownerField.id);
-          owner = resolveOwner(ownerFV?.value);
+          if (ownerFV?.value != null) {
+            owner = await resolveOwnerValue(ownerFV.value, apiKey, users);
+          }
         }
       } catch { /* ok */ }
 
