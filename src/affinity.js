@@ -90,22 +90,28 @@ async function getUsers(apiKey) {
   }
 }
 
+// Extract display name from an Affinity user object (handles camelCase and snake_case)
+function userName(u) {
+  if (!u) return null;
+  if (u.name) return u.name;
+  const first = u.firstName || u.first_name || '';
+  const last = u.lastName || u.last_name || '';
+  return `${first} ${last}`.trim() || null;
+}
+
 // Resolve a raw owner value (user ID or object) to a display name
 async function resolveOwnerValue(raw, apiKey, cachedUsers) {
   if (!raw) return null;
-  if (typeof raw === 'object') {
-    return raw.name || `${raw.first_name || ''} ${raw.last_name || ''}`.trim() || null;
-  }
+  if (typeof raw === 'object') return userName(raw);
   // raw is a user ID — search cached list first (use == for type safety)
   const users = cachedUsers || await getUsers(apiKey);
   // eslint-disable-next-line eqeqeq
   const user = users.find(u => u.id == raw);
-  if (user) return `${user.first_name || ''} ${user.last_name || ''}`.trim() || null;
+  if (user) return userName(user);
   // Last resort: fetch the specific user by ID
   try {
     const res = await getClient(apiKey).get(`/users/${raw}`);
-    const u = res.data;
-    if (u) return `${u.first_name || ''} ${u.last_name || ''}`.trim() || null;
+    if (res.data) return userName(res.data);
   } catch { /* ignore */ }
   return null;
 }
@@ -117,7 +123,7 @@ async function findUserByName(name, apiKey) {
   const needle = name.toLowerCase().trim();
   return (
     users.find(u => {
-      const full = `${u.first_name || ''} ${u.last_name || ''}`.trim().toLowerCase();
+      const full = userName(u)?.toLowerCase() || '';
       return full === needle || full.startsWith(needle) || needle.startsWith(full);
     }) || null
   );
