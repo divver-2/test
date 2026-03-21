@@ -400,7 +400,7 @@ function _latestTs(items, ...fields) {
   }, null);
 }
 
-// Hierarchy: org notes → CEO person last_contacted_at → null
+// Hierarchy: org notes → org persons (Affinity) → CEO email person → null
 async function getLastContacted(orgId, client, ceoEmail) {
   // 1. Org notes
   try {
@@ -413,17 +413,28 @@ async function getLastContacted(orgId, client, ceoEmail) {
     console.log('[Affinity] notes error:', e.response?.status, e.message);
   }
 
-  // 2. CEO person's last_contacted_at
+  // 2. Persons linked to the org in Affinity (works even without CEO email)
+  try {
+    const res = await client.get('/persons', { params: { organization_id: orgId, page_size: 100 } });
+    const people = Array.isArray(res.data) ? res.data : (res.data?.persons || []);
+    console.log('[Affinity] org persons count:', people.length);
+    const ts = _latestTs(people, 'last_contacted_at');
+    if (ts) { console.log('[Affinity] last contacted (org persons):', ts); return ts; }
+  } catch (e) {
+    console.log('[Affinity] org persons error:', e.response?.status, e.message);
+  }
+
+  // 3. CEO person by email (Apollo-enriched fallback)
   if (ceoEmail) {
     try {
       const res = await client.get('/persons', { params: { email: ceoEmail } });
       const people = Array.isArray(res.data) ? res.data : (res.data?.persons || []);
       const person = people[0] || null;
-      console.log('[Affinity] person lookup for', ceoEmail, '→', person ? `id ${person.id}` : 'not found');
+      console.log('[Affinity] person by email', ceoEmail, '→', person ? `id ${person.id}` : 'not found');
       const ts = person?.last_contacted_at || null;
-      if (ts) { console.log('[Affinity] last contacted (person):', ts); return ts; }
+      if (ts) { console.log('[Affinity] last contacted (CEO email):', ts); return ts; }
     } catch (e) {
-      console.log('[Affinity] person lookup error:', e.response?.status, e.message);
+      console.log('[Affinity] CEO email lookup error:', e.response?.status, e.message);
     }
   }
 
