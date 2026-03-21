@@ -175,6 +175,9 @@
     }
     .ceo-name { font-size: 1.05rem; font-weight: 700; }
     .ceo-title { font-size: 0.775rem; color: var(--muted); margin-top: 2px; }
+    .ceo-li { font-size: 0.775rem; margin-top: 4px; }
+    .ceo-li a { color: var(--accent-hover); text-decoration: none; }
+    .ceo-li a:hover { text-decoration: underline; }
     .email-box {
       display: flex; align-items: center; gap: 8px;
       background: var(--surface2); border: 1px solid var(--border);
@@ -319,7 +322,7 @@
 <div class="header">
   <div>
     <h1>Outreach Hub</h1>
-    <p>Type a company name — we'll find the CEO, enrich the data, and add them to Apollo automatically.</p>
+    <p>Type a domain — we'll find the CEO, enrich the data, and draft an outreach email.</p>
   </div>
   <div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end;align-items:center">
     <div class="apollo-pill" id="apolloPill"><div class="pulse"></div> Apollo</div>
@@ -350,10 +353,10 @@
   <div class="search-card">
     <div class="search-row">
       <div class="field grow2">
-        <label>Company Name</label>
-        <input type="text" id="companyInput" placeholder="e.g. Stripe, Vendelux, HubSpot…" autocomplete="off" />
+        <label>Website Domain</label>
+        <input type="text" id="companyInput" placeholder="e.g. stripe.com, hubspot.com…" autocomplete="off" />
       </div>
-      <button class="btn btn-primary" id="addBtn" onclick="addCompany()">Email Company</button>
+      <button class="btn btn-primary" id="addBtn" onclick="addCompany()">Look Up</button>
     </div>
   </div>
 
@@ -386,6 +389,7 @@
           <div>
             <div class="ceo-name" id="ceoName"></div>
             <div class="ceo-title" id="ceoTitle"></div>
+            <div class="ceo-li" id="ceoLinkedin"></div>
           </div>
         </div>
         <div class="email-box">
@@ -630,6 +634,10 @@ function renderResult(data) {
   document.getElementById('ceoName').textContent  = ceo?.name  || 'CEO not found';
   document.getElementById('ceoTitle').textContent = ceo?.title || 'Chief Executive Officer';
   document.getElementById('ceoEmail').textContent = ceo?.email || 'Email not available';
+  const liEl = document.getElementById('ceoLinkedin');
+  liEl.innerHTML = ceo?.linkedinUrl
+    ? `<a href="${esc(ceo.linkedinUrl)}" target="_blank" rel="noopener">LinkedIn →</a>`
+    : '';
 
   const badge = document.getElementById('emailBadge');
   if (ceo?.emailVerified) {
@@ -653,33 +661,34 @@ function renderResult(data) {
 
   // Footer
   const { affinity } = data;
-  const lastEmailStr = affinity?.lastEmailDate
-    ? `Last sent ${fmtDate(affinity.lastEmailDate)}`
-    : 'No emails sent yet';
   const items = [
     {
       ok: affinity?.inAffinity,
-      text: affinity?.inAffinity ? '<strong>Affinity</strong>: found in CRM' : '<strong>Affinity</strong>: not in CRM',
+      label: 'Affinity',
+      value: affinity?.inAffinity ? 'In CRM' : 'Not in CRM',
     },
     {
       ok: !!affinity?.owner,
-      text: affinity?.owner ? `<strong>Owner</strong>: ${esc(affinity.owner)}` : 'No owner set in Affinity',
+      label: 'Owner',
+      value: affinity?.owner ? esc(affinity.owner) : '—',
     },
     {
       ok: affinity?.emailsSent > 0,
-      text: affinity?.emailsSent > 0
-        ? `<strong>${affinity.emailsSent}</strong> email${affinity.emailsSent === 1 ? '' : 's'} sent · <strong>Last:</strong> ${fmtDate(affinity.lastEmailDate)}`
-        : 'No emails sent yet',
+      label: 'Emails Sent',
+      value: affinity?.emailsSent > 0 ? String(affinity.emailsSent) : '0',
+    },
+    {
+      ok: !!affinity?.lastEmailDate,
+      label: 'Last Email',
+      value: affinity?.lastEmailDate ? fmtDate(affinity.lastEmailDate) : 'Never',
     },
   ];
 
   document.getElementById('resultFooter').innerHTML = items.map((item, i) => `
     ${i > 0 ? '<div class="sep"></div>' : ''}
     <div class="status-item">
-      <span class="si-icon" style="color:${item.ok ? 'var(--green)' : 'var(--muted)'}">
-        ${item.ok ? '✓' : '○'}
-      </span>
-      <span class="si-text">${item.text}</span>
+      <span class="si-text" style="color:var(--muted);font-size:0.72rem;text-transform:uppercase;letter-spacing:0.06em;margin-right:2px">${item.label}:</span>
+      <span style="color:${item.ok ? 'var(--text)' : 'var(--muted)'};font-weight:${item.ok ? '600' : '400'}">${item.value}</span>
     </div>
   `).join('') + (data.errors?.length
     ? `<div style="width:100%;margin-top:6px;font-size:0.775rem;color:var(--yellow)">⚠ ${data.errors.map(esc).join(' · ')}</div>`
