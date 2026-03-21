@@ -114,6 +114,7 @@ const KNOWN_USERS = {
   32445700: 'Nick Bunick',
   87482981: 'David Divver',
   100285871: 'Chetan Chaudhary',
+  182265366: 'Nazanin Soltan',
 };
 
 async function resolveOwnerValue(raw, apiKey, cachedUsers) {
