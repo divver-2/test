@@ -444,8 +444,7 @@
   <!-- History table -->
   <div class="card">
     <div class="history-head">
-      <h2>Added Companies</h2>
-      <span class="count-pill" id="countPill">0 companies</span>
+      <h2>Recent Companies</h2>
     </div>
     <div class="table-wrap">
       <table>
@@ -741,15 +740,13 @@ function renderResult(data) {
 // ── Render history table ──────────────────────────────────
 function renderHistory() {
   const tbody = document.getElementById('historyBody');
-  document.getElementById('countPill').textContent =
-    `${history.length} compan${history.length === 1 ? 'y' : 'ies'}`;
 
   if (!history.length) {
     tbody.innerHTML = `<tr><td colspan="8"><div class="empty"><span>🏢</span>No companies added yet.<br>Search above to get started.</div></td></tr>`;
     return;
   }
 
-  tbody.innerHTML = history.slice().reverse().map((h) => {
+  tbody.innerHTML = history.slice(-5).reverse().map((h) => {
     const init = (h.company || '?')[0].toUpperCase();
     const logoHtml = h.logo
       ? `<img src="${esc(h.logo)}" onerror="this.parentElement.textContent='${init}'" />`
