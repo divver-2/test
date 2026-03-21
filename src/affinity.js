@@ -111,6 +111,7 @@ function userName(u) {
 // Fallback map for team member IDs that can't be fetched via the API
 const KNOWN_USERS = {
   16057750: 'Ankit Sud',
+  26040138: 'Christina Fa',
   32445700: 'Nick Bunick',
   87482981: 'David Divver',
   100285871: 'Chetan Chaudhary',
