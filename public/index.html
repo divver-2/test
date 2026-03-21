@@ -457,7 +457,6 @@
             <th>Industry</th>
             <th>Funding</th>
             <th>Affinity Owner</th>
-            <th>Emails Sent</th>
             <th>Status</th>
             <th>Added</th>
           </tr>
@@ -701,11 +700,6 @@ function renderResult(data) {
       value: (affinity?.owners?.length ? affinity.owners : (affinity?.owner ? [affinity.owner] : [])).map(esc).join(', ') || '—',
     },
     {
-      ok: affinity?.emailsSent > 0,
-      label: 'Emails Sent',
-      value: affinity?.emailsSent > 0 ? String(affinity.emailsSent) : '0',
-    },
-    {
       ok: !!affinity?.lastEmailDate,
       label: 'Last Email',
       value: affinity?.lastEmailDate ? fmtDate(affinity.lastEmailDate) : 'Never',
@@ -751,7 +745,7 @@ function renderHistory() {
     `${history.length} compan${history.length === 1 ? 'y' : 'ies'}`;
 
   if (!history.length) {
-    tbody.innerHTML = `<tr><td colspan="9"><div class="empty"><span>🏢</span>No companies added yet.<br>Search above to get started.</div></td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="8"><div class="empty"><span>🏢</span>No companies added yet.<br>Search above to get started.</div></td></tr>`;
     return;
   }
 
@@ -776,7 +770,6 @@ function renderHistory() {
         <td><span style="color:var(--muted);font-size:0.8rem">${esc(cap(h.industry || '—'))}</span></td>
         <td>${h.funding ? `<span class="badge badge-accent">$${esc(h.funding)}</span>` : '<span style="color:var(--muted)">—</span>'}</td>
         <td>${(h.affinityOwners?.length ? h.affinityOwners : (h.affinityOwner ? [h.affinityOwner] : [])).map(o => `<span class="badge badge-accent" style="margin-right:3px">${esc(o)}</span>`).join('') || '<span style="color:var(--muted)">—</span>'}</td>
-        <td>${h.affinityEmails > 0 ? `<span class="badge badge-green">${h.affinityEmails} sent</span>` : '<span class="badge badge-gray">None</span>'}</td>
         <td>${(h.affinityOwners?.length || h.affinityOwner)
           ? '<span class="badge badge-yellow">⚠ Confirm first</span>'
           : '<span class="badge badge-green">✓ OK to send</span>'}</td>

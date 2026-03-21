@@ -410,7 +410,7 @@ function _flattenInteractions(data) {
 // Fetch email interactions for an org and return { emailsSent, lastEmailDate }
 async function getOrgEmailStats(orgId, client) {
   try {
-    const res = await client.get('/interactions', { params: { 'organization_ids[]': orgId } });
+    const res = await client.get('/interactions', { params: { organization_id: orgId } });
     const all = _flattenInteractions(res.data);
     // Filter to emails only (type === "email" string, per Affinity v1 API)
     const emails = all.filter(i => i.type === 'email');
