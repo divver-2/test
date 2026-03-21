@@ -307,40 +307,6 @@
     }
     .btn-mailto:hover { border-color: var(--accent); color: var(--accent-hover); }
 
-    /* ── Sourcing list rows ── */
-    .sourcing-row {
-      display: grid;
-      grid-template-columns: 1fr 140px 130px 38px 110px;
-      align-items: center; gap: 12px;
-      padding: 11px 24px; border-bottom: 1px solid rgba(37,42,74,0.6);
-      transition: background 0.1s;
-    }
-    .sourcing-row:last-child { border-bottom: none; }
-    .sourcing-row:hover { background: rgba(99,102,241,0.04); }
-    .sourcing-row-name { font-weight: 600; font-size: 0.875rem; }
-    .sourcing-row-domain { font-size: 0.75rem; color: var(--muted); margin-top: 2px; }
-    .sourcing-col { font-size: 0.82rem; }
-    .sourcing-head {
-      display: grid;
-      grid-template-columns: 1fr 140px 130px 38px 110px;
-      gap: 12px; padding: 8px 24px 8px;
-      border-bottom: 1px solid var(--border);
-      font-size: 0.68rem; font-weight: 600; text-transform: uppercase;
-      letter-spacing: 0.07em; color: var(--muted);
-    }
-    .free-badge {
-      display: inline-flex; align-items: center; justify-content: center;
-      width: 22px; height: 22px; border-radius: 50%;
-      background: var(--green-soft); border: 1px solid var(--green-border);
-      color: var(--green); font-size: 0.85rem; font-weight: 700;
-    }
-    .sourcing-row-btn {
-      padding: 5px 14px; border-radius: 6px; border: 1px solid var(--border);
-      background: var(--surface2); color: var(--text); font-size: 0.78rem;
-      font-weight: 600; cursor: pointer; white-space: nowrap; transition: all 0.15s;
-    }
-    .sourcing-row-btn:hover { border-color: var(--accent); color: var(--accent-hover); }
-
     .hidden { display: none !important; }
 
     @media (max-width: 620px) {
@@ -397,20 +363,7 @@
         <input type="text" id="companyInput" placeholder="e.g. stripe.com, hubspot.com…" autocomplete="off" />
       </div>
       <button class="btn btn-primary" id="addBtn" onclick="addCompany()">Look Up</button>
-      <button class="btn" id="affinityLoadBtn" onclick="loadSourcingList()" style="background:var(--surface2);border:1px solid var(--border);color:var(--text)">Load Affinity List</button>
     </div>
-  </div>
-
-  <!-- Affinity sourcing list panel -->
-  <div class="result-card hidden" id="sourcingPanel">
-    <div style="padding:18px 24px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between">
-      <div>
-        <span style="font-size:0.7rem;text-transform:uppercase;letter-spacing:0.08em;color:var(--muted);font-weight:600">Affinity Sourcing List</span>
-        <span id="sourcingListName" style="color:var(--muted);font-size:0.8rem;margin-left:8px"></span>
-      </div>
-      <span id="sourcingCount" class="count-pill"></span>
-    </div>
-    <div id="sourcingRows" style="max-height:320px;overflow-y:auto"></div>
   </div>
 
   <!-- Status -->
@@ -819,113 +772,6 @@ async function markConnected(historyIdx) {
     btn.textContent = 'Mark Connected';
     alert('Could not update Affinity: ' + e.message);
   }
-}
-
-// ── Affinity sourcing list ────────────────────────────────
-async function loadSourcingList() {
-  const btn = document.getElementById('affinityLoadBtn');
-  btn.disabled = true;
-  btn.textContent = 'Loading…';
-  setStatus('Fetching Affinity sourcing list…', 'loading');
-
-  try {
-    const res = await fetch('/api/affinity/sourcing-companies', {
-      headers: { 'x-affinity-key': getAffinityKey() },
-    });
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.error || 'Failed to load sourcing list');
-
-    clearStatus();
-    renderSourcingList(data);
-    // Load owner + email details per row after list is visible
-    enrichRowsSequentially(data.companies);
-  } catch (e) {
-    setStatus('Error: ' + e.message, 'error');
-  } finally {
-    btn.disabled = false;
-    btn.textContent = 'Load Affinity List';
-  }
-}
-
-async function enrichRowsSequentially(companies) {
-  for (let i = 0; i < companies.length; i++) {
-    const company = companies[i];
-    try {
-      const res = await fetch(`/api/affinity/company-details?orgId=${company.id}`, {
-        headers: { 'x-affinity-key': getAffinityKey() },
-      });
-      if (!res.ok) continue;
-      const details = await res.json();
-      updateSourcingRow(i, details);
-    } catch { /* skip row on error */ }
-    // 300ms pause between calls to avoid rate limiting
-    await new Promise(r => setTimeout(r, 300));
-  }
-}
-
-function updateSourcingRow(idx, { owner, lastEmailDate }) {
-  const rows = document.querySelectorAll('.sourcing-row');
-  const row = rows[idx];
-  if (!row) return;
-
-  const isFree = !owner && !lastEmailDate;
-  row.querySelector('.sourcing-col-owner').textContent = owner || '—';
-  row.querySelector('.sourcing-col-owner').style.color = owner ? 'var(--text)' : 'var(--muted)';
-  row.querySelector('.sourcing-col-email').textContent = lastEmailDate ? fmtDate(lastEmailDate) : 'Never';
-  row.querySelector('.sourcing-col-email').style.color = lastEmailDate ? 'var(--text)' : 'var(--muted)';
-  const badgeEl = row.querySelector('.sourcing-col-badge');
-  badgeEl.innerHTML = isFree ? '<span class="free-badge" title="No owner, no emails sent — free to contact">✓</span>' : '';
-}
-
-function renderSourcingList({ list, companies }) {
-  const panel = document.getElementById('sourcingPanel');
-  document.getElementById('sourcingListName').textContent = list?.name ? `— ${list.name}` : '';
-  document.getElementById('sourcingCount').textContent = `${companies.length} compan${companies.length === 1 ? 'y' : 'ies'}`;
-
-  const rowsEl = document.getElementById('sourcingRows');
-  if (!companies.length) {
-    rowsEl.innerHTML = '<div class="empty"><span>📋</span>No companies found in sourcing list.</div>';
-  } else {
-    const header = `
-      <div class="sourcing-head">
-        <span>Company</span>
-        <span>Owner</span>
-        <span>Last Email</span>
-        <span></span>
-        <span></span>
-      </div>`;
-    const rows = companies.map((c, i) => `
-      <div class="sourcing-row">
-        <div>
-          <div class="sourcing-row-name">${esc(c.name)}</div>
-          <div class="sourcing-row-domain">${esc(c.domain || '—')}</div>
-        </div>
-        <div class="sourcing-col sourcing-col-owner" style="color:var(--muted)">…</div>
-        <div class="sourcing-col sourcing-col-email" style="color:var(--muted)">…</div>
-        <div class="sourcing-col-badge"></div>
-        <button class="sourcing-row-btn" onclick="enrichFromAffinity(${i})">Enrich →</button>
-      </div>`).join('');
-    rowsEl.innerHTML = header + rows;
-  }
-
-  panel._companies = companies;
-  panel.classList.remove('hidden');
-}
-
-async function enrichFromAffinity(idx) {
-  const panel = document.getElementById('sourcingPanel');
-  const company = panel._companies?.[idx];
-  if (!company) return;
-
-  const domain = company.domain || company.name;
-  document.getElementById('companyInput').value = domain;
-
-  // Highlight the selected row
-  document.querySelectorAll('.sourcing-row').forEach((r, i) => {
-    r.style.background = i === idx ? 'rgba(99,102,241,0.1)' : '';
-  });
-
-  addCompany();
 }
 
 // ── Init ──────────────────────────────────────────────────
