@@ -125,8 +125,7 @@ async function getSourcingList(apiKey) {
 // Add an organization to a list, returns the new list entry
 async function addOrgToList(listId, orgId, apiKey) {
   const client = getClient(apiKey);
-  const res = await client.post('/list-entries', {
-    list_id: listId,
+  const res = await client.post(`/lists/${listId}/list-entries`, {
     entity_id: orgId,
     entity_type: ENTITY_TYPE.ORGANIZATION,
   });
@@ -368,8 +367,8 @@ async function getSourcingListCompanies(apiKey) {
   let page = 1;
 
   while (true) {
-    const res = await client.get('/list-entries', {
-      params: { list_id: list.id, page_size: 100, page },
+    const res = await client.get(`/lists/${list.id}/list-entries`, {
+      params: { page_size: 100, page },
     });
     const entries = Array.isArray(res.data)
       ? res.data
