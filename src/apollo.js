@@ -71,7 +71,7 @@ async function findCEOViaOrgChart(domain, apiKey) {
 async function findCEO(domain, apiKey) {
   try {
     const res = await axios.post(
-      `${APOLLO_BASE}/mixed_people/search`,
+      `${APOLLO_BASE}/mixed_people/api_search`,
       {
         q_organization_domains_list: [domain],
         person_seniorities: ['c_suite'],
