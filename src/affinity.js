@@ -385,40 +385,46 @@ async function lookupCompanyInAffinity(companyName, apiKey, domain) {
   console.log('[Affinity] resolved owner:', result.owner);
 
   // ── Last email sent (via interactions) ────────────────────────────────────
-  try {
-    const intRes = await client.get('/interactions', {
-      params: { 'organization_ids[]': org.id },
-    });
-    console.log('[Affinity] interactions raw keys:', Object.keys(intRes.data || {}));
-    // Use email_interactions directly (already email-only); fall back to filtered general interactions
-    const emails = intRes.data?.email_interactions
-      || (intRes.data?.interactions || intRes.data?.activity_logs || (Array.isArray(intRes.data) ? intRes.data : []))
-          .filter(l => !l.type || l.type === 'email' || l.type_id === 0 || l.type_id === 1);
-    result.emailsSent = emails.length;
-    if (emails.length > 0) {
-      const sorted = [...emails].sort(
-        (a, b) => new Date(b.date || b.created_at || 0) - new Date(a.date || a.created_at || 0)
-      );
-      result.lastEmailDate = sorted[0]?.date || sorted[0]?.created_at || null;
-    }
-    console.log('[Affinity] emails:', result.emailsSent, '| lastEmailDate:', result.lastEmailDate);
-  } catch (e) {
-    console.log('[Affinity] interactions error:', e.response?.status, e.message);
-    // Fallback: try activity-logs without type filter
-    try {
-      const intRes2 = await client.get('/activity-logs', { params: { 'organization_ids[]': org.id } });
-      console.log('[Affinity] activity-logs raw keys:', Object.keys(intRes2.data || {}));
-      const logs2 = intRes2.data?.activity_logs || intRes2.data?.interactions || (Array.isArray(intRes2.data) ? intRes2.data : []);
-      result.emailsSent = logs2.length;
-      if (logs2.length > 0) {
-        const sorted2 = [...logs2].sort((a, b) => new Date(b.date || b.created_at || 0) - new Date(a.date || a.created_at || 0));
-        result.lastEmailDate = sorted2[0]?.date || sorted2[0]?.created_at || null;
-      }
-      console.log('[Affinity] activity-logs emails:', result.emailsSent, '| lastEmailDate:', result.lastEmailDate);
-    } catch (e2) { console.log('[Affinity] activity-logs error:', e2.response?.status, e2.message); }
-  }
+  const emailStats = await getOrgEmailStats(org.id, client);
+  result.emailsSent = emailStats.emailsSent;
+  result.lastEmailDate = emailStats.lastEmailDate;
+  console.log('[Affinity] emails:', result.emailsSent, '| lastEmailDate:', result.lastEmailDate);
 
   return result;
+}
+
+// ── Email interaction helpers ─────────────────────────────────────────────────
+
+// Normalize a raw /interactions response to a flat array of all interactions
+function _flattenInteractions(data) {
+  if (Array.isArray(data)) return data;
+  // Affinity may wrap by type — merge all known keys
+  return [
+    ...(data?.email_interactions || []),
+    ...(data?.meeting_interactions || []),
+    ...(data?.interactions || []),
+    ...(data?.activity_logs || []),
+  ];
+}
+
+// Fetch email interactions for an org and return { emailsSent, lastEmailDate }
+async function getOrgEmailStats(orgId, client) {
+  try {
+    const res = await client.get('/interactions', { params: { 'organization_ids[]': orgId } });
+    const all = _flattenInteractions(res.data);
+    // Filter to emails only (type === "email" string, per Affinity v1 API)
+    const emails = all.filter(i => i.type === 'email');
+    const emailsSent = emails.length;
+    const lastEmailDate = emails.reduce((latest, i) => {
+      const ts = i.created_at || i.timestamp || null;
+      if (!ts) return latest;
+      return !latest || new Date(ts) > new Date(latest) ? ts : latest;
+    }, null);
+    return { emailsSent, lastEmailDate };
+  } catch (e) {
+    console.log('[Affinity] getOrgEmailStats error:', e.response?.status, e.message);
+    return { emailsSent: 0, lastEmailDate: null };
+  }
 }
 
 // ── Get all companies from the sourcing list ───────────────────────────────────
@@ -488,20 +494,7 @@ async function getCompanyDetails(orgId, apiKey) {
     }
   } catch { /* ok */ }
 
-  try {
-    const intRes = await client.get('/interactions', {
-      params: { 'organization_ids[]': orgId },
-    });
-    const interactions = intRes.data?.interactions || intRes.data?.email_interactions
-      || intRes.data?.activity_logs || (Array.isArray(intRes.data) ? intRes.data : []);
-    emailsSent = interactions.length;
-    if (interactions.length > 0) {
-      const sorted = [...interactions].sort(
-        (a, b) => new Date(b.date || b.created_at || 0) - new Date(a.date || a.created_at || 0)
-      );
-      lastEmailDate = sorted[0]?.date || sorted[0]?.created_at || null;
-    }
-  } catch { /* ok */ }
+  ({ emailsSent, lastEmailDate } = await getOrgEmailStats(orgId, client));
 
   return { owner, lastEmailDate, emailsSent };
 }
@@ -550,20 +543,7 @@ async function getSourcingListWithDetails(apiKey) {
         }
       } catch { /* ok */ }
 
-      try {
-        const intRes = await client.get('/interactions', {
-          params: { 'organization_ids[]': company.id },
-        });
-        const interactions = intRes.data?.interactions || intRes.data?.email_interactions
-          || intRes.data?.activity_logs || (Array.isArray(intRes.data) ? intRes.data : []);
-        emailsSent = interactions.length;
-        if (interactions.length > 0) {
-          const sorted = [...interactions].sort(
-            (a, b) => new Date(b.date || b.created_at || 0) - new Date(a.date || a.created_at || 0)
-          );
-          lastEmailDate = sorted[0]?.date || sorted[0]?.created_at || null;
-        }
-      } catch { /* ok */ }
+      ({ emailsSent, lastEmailDate } = await getOrgEmailStats(company.id, client));
 
       return { ...company, owner, lastEmailDate, emailsSent };
     }));
