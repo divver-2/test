@@ -384,46 +384,24 @@ async function lookupCompanyInAffinity(companyName, apiKey, domain) {
   } catch (e) { console.log('[Affinity] owner error:', e.response?.status, e.message); }
   console.log('[Affinity] resolved owner:', result.owner);
 
-  // ── Last email sent (via interactions) ────────────────────────────────────
-  const emailStats = await getOrgEmailStats(org.id, client);
-  result.emailsSent = emailStats.emailsSent;
-  result.lastEmailDate = emailStats.lastEmailDate;
-  console.log('[Affinity] emails:', result.emailsSent, '| lastEmailDate:', result.lastEmailDate);
+  // ── Last contacted ─────────────────────────────────────────────────────────
+  result.lastEmailDate = await getLastContacted(org.id, client);
 
   return result;
 }
 
-// ── Email interaction helpers ─────────────────────────────────────────────────
+// ── Last contacted ────────────────────────────────────────────────────────────
 
-// Normalize a raw /interactions response to a flat array of all interactions
-function _flattenInteractions(data) {
-  if (Array.isArray(data)) return data;
-  // Affinity may wrap by type — merge all known keys
-  return [
-    ...(data?.email_interactions || []),
-    ...(data?.meeting_interactions || []),
-    ...(data?.interactions || []),
-    ...(data?.activity_logs || []),
-  ];
-}
-
-// Fetch email interactions for an org and return { emailsSent, lastEmailDate }
-async function getOrgEmailStats(orgId, client) {
+// Read last_contacted_at directly from the organization object — fast and reliable
+async function getLastContacted(orgId, client) {
   try {
-    const res = await client.get('/interactions', { params: { organization_id: orgId } });
-    const all = _flattenInteractions(res.data);
-    // Filter to emails only (type === "email" string, per Affinity v1 API)
-    const emails = all.filter(i => i.type === 'email');
-    const emailsSent = emails.length;
-    const lastEmailDate = emails.reduce((latest, i) => {
-      const ts = i.created_at || i.timestamp || null;
-      if (!ts) return latest;
-      return !latest || new Date(ts) > new Date(latest) ? ts : latest;
-    }, null);
-    return { emailsSent, lastEmailDate };
+    const res = await client.get(`/organizations/${orgId}`);
+    const ts = res.data?.last_contacted_at || null;
+    console.log('[Affinity] last_contacted_at:', ts);
+    return ts;
   } catch (e) {
-    console.log('[Affinity] getOrgEmailStats error:', e.response?.status, e.message);
-    return { emailsSent: 0, lastEmailDate: null };
+    console.log('[Affinity] getLastContacted error:', e.response?.status, e.message);
+    return null;
   }
 }
 
@@ -494,7 +472,7 @@ async function getCompanyDetails(orgId, apiKey) {
     }
   } catch { /* ok */ }
 
-  ({ emailsSent, lastEmailDate } = await getOrgEmailStats(orgId, client));
+  lastEmailDate = await getLastContacted(orgId, client);
 
   return { owner, lastEmailDate, emailsSent };
 }
@@ -543,7 +521,7 @@ async function getSourcingListWithDetails(apiKey) {
         }
       } catch { /* ok */ }
 
-      ({ emailsSent, lastEmailDate } = await getOrgEmailStats(company.id, client));
+      lastEmailDate = await getLastContacted(company.id, client);
 
       return { ...company, owner, lastEmailDate, emailsSent };
     }));
