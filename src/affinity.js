@@ -367,7 +367,6 @@ async function getSourcingListCompanies(apiKey) {
   let allEntries = [];
   let page = 1;
 
-  // Paginate through all entries
   while (true) {
     const res = await client.get('/list-entries', {
       params: { list_id: list.id, page_size: 100, page },
@@ -392,6 +391,77 @@ async function getSourcingListCompanies(apiKey) {
   return { list: { id: list.id, name: list.name }, companies };
 }
 
+// ── Get sourcing list companies with owner + last email data ──────────────────
+
+async function getSourcingListWithDetails(apiKey) {
+  const { list, companies } = await getSourcingListCompanies(apiKey);
+  const client = getClient(apiKey);
+
+  // Fetch once: global field definitions + all users
+  const [globalFields, users] = await Promise.all([
+    getGlobalFields(apiKey),
+    getUsers(apiKey),
+  ]);
+
+  const ownerField = globalFields.find(f =>
+    f.name?.toLowerCase() === 'owner' ||
+    f.name?.toLowerCase().includes('global owner') ||
+    f.name?.toLowerCase().includes('owner')
+  );
+
+  // Helper: resolve an owner field value to a display name
+  function resolveOwner(raw) {
+    if (!raw) return null;
+    if (typeof raw === 'object') {
+      return raw.name || `${raw.first_name || ''} ${raw.last_name || ''}`.trim() || null;
+    }
+    const user = users.find(u => u.id === raw);
+    return user ? `${user.first_name || ''} ${user.last_name || ''}`.trim() : null;
+  }
+
+  // Enrich each company 5 at a time to avoid rate limits
+  const BATCH = 5;
+  const enriched = [];
+  for (let i = 0; i < companies.length; i += BATCH) {
+    const batch = companies.slice(i, i + BATCH);
+    const results = await Promise.all(batch.map(async (company) => {
+      let owner = null;
+      let lastEmailDate = null;
+      let emailsSent = 0;
+
+      try {
+        const fvRes = await client.get('/field-values', {
+          params: { organization_id: company.id },
+        });
+        const fieldValues = Array.isArray(fvRes.data) ? fvRes.data : [];
+        if (ownerField) {
+          const ownerFV = fieldValues.find(fv => fv.field_id === ownerField.id);
+          owner = resolveOwner(ownerFV?.value);
+        }
+      } catch { /* ok */ }
+
+      try {
+        const intRes = await client.get('/interactions', {
+          params: { organization_id: company.id, type: 'email' },
+        });
+        const interactions = intRes.data?.interactions || (Array.isArray(intRes.data) ? intRes.data : []);
+        emailsSent = interactions.length;
+        if (interactions.length > 0) {
+          const sorted = [...interactions].sort(
+            (a, b) => new Date(b.date || b.created_at || 0) - new Date(a.date || a.created_at || 0)
+          );
+          lastEmailDate = sorted[0]?.date || sorted[0]?.created_at || null;
+        }
+      } catch { /* ok */ }
+
+      return { ...company, owner, lastEmailDate, emailsSent };
+    }));
+    enriched.push(...results);
+  }
+
+  return { list, companies: enriched };
+}
+
 module.exports = {
   upsertOrganization,
   upsertPerson,
@@ -400,4 +470,5 @@ module.exports = {
   lookupCompanyInAffinity,
   setGlobalOwner,
   getSourcingListCompanies,
+  getSourcingListWithDetails,
 };
