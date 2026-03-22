@@ -372,7 +372,7 @@ async function lookupCompanyInAffinity(companyName, apiKey, domain, ceoEmail) {
   console.log('[Affinity] resolved owner:', result.owner);
 
   // ── Last contacted ─────────────────────────────────────────────────────────
-  result.lastEmailDate = await getLastContacted(org.id, client);
+  result.lastEmailDate = await getLastContacted(org.id, client, domain);
 
   return result;
 }
@@ -388,16 +388,21 @@ function _latestTs(items, ...fields) {
 }
 
 // Hierarchy: person interaction dates → notes → null
-async function getLastContacted(orgId, client) {
-  // 1. Fetch persons with interaction dates in one call (most reliable signal)
+async function getLastContacted(orgId, client, domain) {
+  // 1. Fetch persons with interaction dates — only count contacts at the company's own domain
   try {
     const personsRes = await client.get('/persons', {
       params: { organization_id: orgId, with_interaction_dates: true, page_size: 100 },
     });
     const persons = Array.isArray(personsRes.data) ? personsRes.data : (personsRes.data?.persons || []);
     console.log('[Affinity] org persons (with interaction dates):', persons.length);
+    // Filter to only people whose email matches the company domain
+    const domainPersons = domain
+      ? persons.filter(p => (p.primary_email || '').toLowerCase().endsWith(`@${domain.toLowerCase()}`))
+      : persons;
+    console.log('[Affinity] domain-matched persons:', domainPersons.length);
     let best = null;
-    for (const p of persons) {
+    for (const p of domainPersons) {
       const d = p.interaction_dates;
       const ts = d?.last_email_date || d?.last_interaction_date || d?.last_event_date || null;
       if (ts && (!best || new Date(ts) > new Date(best))) best = ts;
