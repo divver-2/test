@@ -396,6 +396,7 @@ async function getLastContacted(orgId, client, domain) {
     });
     const persons = Array.isArray(personsRes.data) ? personsRes.data : (personsRes.data?.persons || []);
     console.log('[Affinity] org persons (with interaction dates):', persons.length);
+    console.log('[Affinity] sample emails:', persons.slice(0, 5).map(p => ({ primary: p.primary_email, emails: p.emails })));
     // Filter to only people whose email matches the company domain
     const domainLower = domain?.toLowerCase();
     const domainPersons = domainLower
