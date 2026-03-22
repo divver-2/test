@@ -396,14 +396,10 @@ async function getLastContacted(orgId, client) {
     });
     const persons = Array.isArray(personsRes.data) ? personsRes.data : (personsRes.data?.persons || []);
     console.log('[Affinity] org persons (with interaction dates):', persons.length);
-    if (persons.length) console.log('[Affinity] sample person keys:', JSON.stringify(Object.keys(persons[0])));
-    if (persons.length) console.log('[Affinity] sample person interaction fields:', JSON.stringify(
-      Object.fromEntries(Object.entries(persons[0]).filter(([k]) => /date|contact|email|event|interact/i.test(k)))
-    ));
     let best = null;
     for (const p of persons) {
-      // Affinity returns last_email_at, last_event_at on person when with_interaction_dates=true
-      const ts = p.last_email_at || p.last_event_at || p.last_contacted_at || null;
+      const d = p.interaction_dates;
+      const ts = d?.last_email_date || d?.last_interaction_date || d?.last_event_date || null;
       if (ts && (!best || new Date(ts) > new Date(best))) best = ts;
     }
     if (best) { console.log('[Affinity] last contacted (person interactions):', best); return best; }
