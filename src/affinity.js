@@ -19,7 +19,7 @@ function getClient(apiKey) {
 
 async function findOrganization(name, apiKey) {
   const client = getClient(apiKey);
-  const res = await client.get('/organizations', { params: { term: name, page_size: 5 } });
+  const res = await client.get('/organizations', { params: { term: name, page_size: 5, with_interaction_dates: true } });
   const orgs = res.data?.organizations || (Array.isArray(res.data) ? res.data : []);
   console.log(`[Affinity] findOrganization("${name}") → ${orgs.length} results:`, orgs.map(o => o.name));
   const exact = orgs.find(o => o.name?.toLowerCase() === name.toLowerCase());
@@ -372,7 +372,11 @@ async function lookupCompanyInAffinity(companyName, apiKey, domain, ceoEmail) {
   console.log('[Affinity] resolved owner:', result.owner);
 
   // ── Last contacted ─────────────────────────────────────────────────────────
-  result.lastEmailDate = await getLastContacted(org.id, client, domain);
+  // Check org-level interaction dates first (from with_interaction_dates=true on the search)
+  const orgDates = org.interaction_dates;
+  const orgLastEmail = orgDates?.last_email_date || orgDates?.last_interaction_date || null;
+  console.log('[Affinity] org-level last email date:', orgLastEmail);
+  result.lastEmailDate = orgLastEmail || await getLastContacted(org.id, client, domain);
 
   return result;
 }
