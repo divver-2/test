@@ -400,9 +400,20 @@ function _latestTs(items, ...fields) {
   }, null);
 }
 
-// Hierarchy: org notes → org persons (Affinity) → CEO email person → null
+// Hierarchy: interactions → notes → CEO email person → null
 async function getLastContacted(orgId, client, ceoEmail) {
-  // 1. Org notes
+  // 1. Email interactions (most reliable — actual email history)
+  try {
+    const res = await client.get('/interactions', { params: { organization_id: orgId, page_size: 500 } });
+    const interactions = Array.isArray(res.data) ? res.data : (res.data?.interactions || []);
+    console.log('[Affinity] interactions count:', interactions.length);
+    const ts = _latestTs(interactions, 'interaction_date', 'created_at');
+    if (ts) { console.log('[Affinity] last contacted (interactions):', ts); return ts; }
+  } catch (e) {
+    console.log('[Affinity] interactions error:', e.response?.status, e.message);
+  }
+
+  // 2. Org notes
   try {
     const res = await client.get('/notes', { params: { organization_id: orgId, page_size: 50 } });
     const notes = Array.isArray(res.data) ? res.data : (res.data?.notes || []);
@@ -411,17 +422,6 @@ async function getLastContacted(orgId, client, ceoEmail) {
     if (ts) { console.log('[Affinity] last contacted (notes):', ts); return ts; }
   } catch (e) {
     console.log('[Affinity] notes error:', e.response?.status, e.message);
-  }
-
-  // 2. Persons linked to the org in Affinity (works even without CEO email)
-  try {
-    const res = await client.get('/persons', { params: { organization_id: orgId, page_size: 100 } });
-    const people = Array.isArray(res.data) ? res.data : (res.data?.persons || []);
-    console.log('[Affinity] org persons count:', people.length);
-    const ts = _latestTs(people, 'last_contacted_at');
-    if (ts) { console.log('[Affinity] last contacted (org persons):', ts); return ts; }
-  } catch (e) {
-    console.log('[Affinity] org persons error:', e.response?.status, e.message);
   }
 
   // 3. CEO person by email (Apollo-enriched fallback)
