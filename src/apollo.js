@@ -101,8 +101,17 @@ async function findCEO(domain, apiKey) {
     );
     const broadPeople = broad.data.people || [];
     const broadCeo = broadPeople.find(p => /ceo|founder|president|director/i.test(p.title || '')) || broadPeople[0] || null;
+    if (broadCeo) {
+      // Normalize: Apollo broad search sometimes omits last_name
+      if (!broadCeo.last_name && broadCeo.name) {
+        const parts = broadCeo.name.trim().split(/\s+/);
+        broadCeo.first_name = broadCeo.first_name || parts[0];
+        broadCeo.last_name = parts.length > 1 ? parts.slice(1).join(' ') : '';
+      }
+      broadCeo.last_name = broadCeo.last_name || '';
+    }
     console.log('[Apollo] findCEO result:', broadCeo
-      ? { id: broadCeo.id, name: `${broadCeo.first_name} ${broadCeo.last_name}`, title: broadCeo.title }
+      ? { id: broadCeo.id, name: `${broadCeo.first_name} ${broadCeo.last_name}`.trim(), title: broadCeo.title }
       : 'null');
     return broadCeo;
   } catch (e) {

@@ -391,7 +391,7 @@ function _latestTs(items, ...fields) {
 async function getLastContacted(orgId, client) {
   // 1. Person-level interactions (real signal — where Affinity stores email activity)
   try {
-    const personsRes = await client.get(`/organizations/${orgId}/persons`, { params: { page_size: 10 } });
+    const personsRes = await client.get('/persons', { params: { organization_id: orgId, page_size: 10 } });
     const persons = Array.isArray(personsRes.data) ? personsRes.data : (personsRes.data?.persons || []);
     console.log('[Affinity] org persons (for interactions):', persons.length);
     let best = null;
