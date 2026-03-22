@@ -73,28 +73,15 @@ async function upsertPerson({ firstName, lastName, email, organizationId }, apiK
 
 // ── Users ─────────────────────────────────────────────────────────────────────
 
-// Get all users in the Affinity workspace
+// Get current user from Affinity workspace (Affinity v1 /users doesn't exist)
 async function getUsers(apiKey) {
-  const client = getClient(apiKey);
   try {
-    const res = await client.get('/users');
-    console.log('[Affinity] /users raw:', JSON.stringify(res.data)?.slice(0, 200));
-    // Affinity v1 returns an array directly or { users: [...] }
-    if (Array.isArray(res.data)) return res.data;
-    if (Array.isArray(res.data?.users)) return res.data.users;
-    return [];
+    const me = await getClient(apiKey).get('/auth/whoami');
+    const user = me.data?.user || me.data;
+    return user ? [user] : [];
   } catch (e) {
-    console.log('[Affinity] /users error:', e.response?.status, e.message);
-    try {
-      const me = await getClient(apiKey).get('/auth/whoami');
-      console.log('[Affinity] /auth/whoami raw:', JSON.stringify(me.data)?.slice(0, 200));
-      // Affinity whoami returns { user: {...} } or a bare user object
-      const user = me.data?.user || me.data;
-      return user ? [user] : [];
-    } catch (e2) {
-      console.log('[Affinity] /auth/whoami error:', e2.response?.status, e2.message);
-      return [];
-    }
+    console.log('[Affinity] /auth/whoami error:', e.response?.status, e.message);
+    return [];
   }
 }
 
@@ -385,7 +372,7 @@ async function lookupCompanyInAffinity(companyName, apiKey, domain, ceoEmail) {
   console.log('[Affinity] resolved owner:', result.owner);
 
   // ── Last contacted ─────────────────────────────────────────────────────────
-  result.lastEmailDate = await getLastContacted(org.id, client, ceoEmail);
+  result.lastEmailDate = await getLastContacted(org.id, client);
 
   return result;
 }
@@ -400,20 +387,28 @@ function _latestTs(items, ...fields) {
   }, null);
 }
 
-// Hierarchy: interactions → notes → CEO email person → null
-async function getLastContacted(orgId, client, ceoEmail) {
-  // 1. Email interactions (most reliable — actual email history)
+// Hierarchy: person interactions → notes → null
+async function getLastContacted(orgId, client) {
+  // 1. Person-level interactions (real signal — where Affinity stores email activity)
   try {
-    const res = await client.get('/interactions', { params: { organization_id: orgId, page_size: 500 } });
-    const interactions = Array.isArray(res.data) ? res.data : (res.data?.interactions || []);
-    console.log('[Affinity] interactions count:', interactions.length);
-    const ts = _latestTs(interactions, 'interaction_date', 'created_at');
-    if (ts) { console.log('[Affinity] last contacted (interactions):', ts); return ts; }
+    const personsRes = await client.get(`/organizations/${orgId}/persons`, { params: { page_size: 10 } });
+    const persons = Array.isArray(personsRes.data) ? personsRes.data : (personsRes.data?.persons || []);
+    console.log('[Affinity] org persons (for interactions):', persons.length);
+    let best = null;
+    for (const person of persons.slice(0, 10)) {
+      try {
+        const iRes = await client.get('/interactions', { params: { person_id: person.id, page_size: 20 } });
+        const interactions = Array.isArray(iRes.data) ? iRes.data : (iRes.data?.interactions || []);
+        const ts = _latestTs(interactions, 'interaction_date', 'created_at');
+        if (ts && (!best || new Date(ts) > new Date(best))) best = ts;
+      } catch (e) { /* skip this person */ }
+    }
+    if (best) { console.log('[Affinity] last contacted (person interactions):', best); return best; }
   } catch (e) {
-    console.log('[Affinity] interactions error:', e.response?.status, e.message);
+    console.log('[Affinity] org persons error:', e.response?.status, e.message);
   }
 
-  // 2. Org notes
+  // 2. Org notes (manual/sparse fallback)
   try {
     const res = await client.get('/notes', { params: { organization_id: orgId, page_size: 50 } });
     const notes = Array.isArray(res.data) ? res.data : (res.data?.notes || []);
@@ -422,20 +417,6 @@ async function getLastContacted(orgId, client, ceoEmail) {
     if (ts) { console.log('[Affinity] last contacted (notes):', ts); return ts; }
   } catch (e) {
     console.log('[Affinity] notes error:', e.response?.status, e.message);
-  }
-
-  // 3. CEO person by email (Apollo-enriched fallback)
-  if (ceoEmail) {
-    try {
-      const res = await client.get('/persons', { params: { email: ceoEmail } });
-      const people = Array.isArray(res.data) ? res.data : (res.data?.persons || []);
-      const person = people[0] || null;
-      console.log('[Affinity] person by email', ceoEmail, '→', person ? `id ${person.id}` : 'not found');
-      const ts = person?.last_contacted_at || null;
-      if (ts) { console.log('[Affinity] last contacted (CEO email):', ts); return ts; }
-    } catch (e) {
-      console.log('[Affinity] CEO email lookup error:', e.response?.status, e.message);
-    }
   }
 
   console.log('[Affinity] last contacted: no data found');

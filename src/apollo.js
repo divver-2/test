@@ -67,9 +67,10 @@ async function findCEOViaOrgChart(domain, apiKey) {
 }
 
 // Find the CEO of a company by domain.
-// Tries mixed_people/search (paid) first, falls back to org chart (free).
+// Tries targeted title search first, then broad domain search, then org chart.
 async function findCEO(domain, apiKey) {
   try {
+    // Pass 1: targeted c-suite title search
     const res = await axios.post(
       `${APOLLO_BASE}/mixed_people/api_search`,
       {
@@ -86,10 +87,24 @@ async function findCEO(domain, apiKey) {
     );
     const people = res.data.people || [];
     const ceo = people.find(p => /ceo|chief executive|founder/i.test(p.title || '')) || people[0] || null;
-    console.log('[Apollo] findCEO result:', ceo
-      ? { id: ceo.id, name: `${ceo.first_name} ${ceo.last_name}`, title: ceo.title }
+    if (ceo) {
+      console.log('[Apollo] findCEO result:', { id: ceo.id, name: `${ceo.first_name} ${ceo.last_name}`, title: ceo.title });
+      return ceo;
+    }
+
+    // Pass 2: broad domain search — pick most senior person
+    console.log('[Apollo] findCEO: no c-suite match, trying broad domain search');
+    const broad = await axios.post(
+      `${APOLLO_BASE}/mixed_people/api_search`,
+      { q_organization_domains_list: [domain], per_page: 10 },
+      { headers: getHeaders(apiKey) }
+    );
+    const broadPeople = broad.data.people || [];
+    const broadCeo = broadPeople.find(p => /ceo|founder|president|director/i.test(p.title || '')) || broadPeople[0] || null;
+    console.log('[Apollo] findCEO result:', broadCeo
+      ? { id: broadCeo.id, name: `${broadCeo.first_name} ${broadCeo.last_name}`, title: broadCeo.title }
       : 'null');
-    return ceo;
+    return broadCeo;
   } catch (e) {
     if (e.response?.status !== 403) throw e;
     console.log('[Apollo] mixed_people/search not available, trying org chart fallback');
