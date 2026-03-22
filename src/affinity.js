@@ -387,21 +387,20 @@ function _latestTs(items, ...fields) {
   }, null);
 }
 
-// Hierarchy: person interactions → notes → null
+// Hierarchy: person interaction dates → notes → null
 async function getLastContacted(orgId, client) {
-  // 1. Person-level interactions (real signal — where Affinity stores email activity)
+  // 1. Fetch persons with interaction dates in one call (most reliable signal)
   try {
-    const personsRes = await client.get('/persons', { params: { organization_id: orgId, page_size: 10 } });
+    const personsRes = await client.get('/persons', {
+      params: { organization_id: orgId, with_interaction_dates: true, page_size: 100 },
+    });
     const persons = Array.isArray(personsRes.data) ? personsRes.data : (personsRes.data?.persons || []);
-    console.log('[Affinity] org persons (for interactions):', persons.length);
+    console.log('[Affinity] org persons (with interaction dates):', persons.length);
     let best = null;
-    for (const person of persons.slice(0, 10)) {
-      try {
-        const iRes = await client.get('/interactions', { params: { person_id: person.id, page_size: 20 } });
-        const interactions = Array.isArray(iRes.data) ? iRes.data : (iRes.data?.interactions || []);
-        const ts = _latestTs(interactions, 'interaction_date', 'created_at');
-        if (ts && (!best || new Date(ts) > new Date(best))) best = ts;
-      } catch (e) { /* skip this person */ }
+    for (const p of persons) {
+      // Affinity returns last_email_at, last_event_at on person when with_interaction_dates=true
+      const ts = p.last_email_at || p.last_event_at || p.last_contacted_at || null;
+      if (ts && (!best || new Date(ts) > new Date(best))) best = ts;
     }
     if (best) { console.log('[Affinity] last contacted (person interactions):', best); return best; }
   } catch (e) {
