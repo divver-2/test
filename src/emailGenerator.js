@@ -33,16 +33,24 @@ function generateInitialEmail({ ceoName, companyName, industry, description, sen
   const firstName = ceoName ? ceoName.split(' ')[0] : null;
   const greeting = firstName ? `Hi ${firstName},` : 'Hi,';
 
-  const productLine = description
-    ? `I've heard strong feedback on ${description.charAt(0).toLowerCase() + description.slice(1).replace(/\.$/, '')}.`
+  // Use only the first sentence of the description to keep the email concise
+  const firstSentence = description
+    ? description.split(/(?<=[.!?])\s+/)[0].replace(/\.$/, '')
+    : null;
+  const productLine = firstSentence
+    ? `I've heard strong feedback on ${firstSentence.charAt(0).toLowerCase() + firstSentence.slice(1)}.`
     : `I've heard strong feedback on what you are building.`;
 
   return {
     subject: `Connecting from NewView Capital`,
     body: `${greeting}
+
 Hope all is well. I'm an investor at NewView Capital, a $3.1B venture growth fund.
+
 I wanted to reach out as ${themeLine}. ${companyName || 'Your company'} is a great example of that and ${productLine}
+
 I'm excited about what you are building and wanted to see if it was a good time to connect.
+
 Thanks,
 ${senderFirst}`,
   };
