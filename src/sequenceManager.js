@@ -2,6 +2,7 @@ const apollo = require('./apollo');
 const affinity = require('./affinity');
 const hunter = require('./hunter');
 const { buildEmailSequence, FOLLOWUP_DELAY_DAYS } = require('./emailGenerator');
+const tracker = require('./outreachTracker');
 
 const SEQUENCE_NAME_PREFIX = 'CEO Outreach —';
 
@@ -121,6 +122,15 @@ async function runOutreachSequence({ email, senderName, apiKey }) {
         { orgId: org.id, senderName },
         affinityKey
       );
+
+      // Persist IDs so the Apollo reply webhook can flip status to Connected
+      if (results.affinityList?.priorityFieldValueId && results.affinityList?.connectedOptionId) {
+        tracker.saveTracking(domain, {
+          priorityFieldValueId: results.affinityList.priorityFieldValueId,
+          connectedOptionId: results.affinityList.connectedOptionId,
+          orgId: org.id,
+        });
+      }
     } catch (e) {
       results.errors.push(`Affinity sync failed: ${e.message}`);
     }
@@ -474,7 +484,16 @@ async function launchEmailOutreach({ companyData, ceoData, emailSequence, apiKey
           organizationId: org.id,
         }, affinityKey);
       }
-      await affinity.addToSourcingList({ orgId: org.id, senderName: 'David Divver' }, affinityKey);
+      const listResult = await affinity.addToSourcingList({ orgId: org.id, senderName: 'David Divver' }, affinityKey);
+
+      // Persist IDs so the Apollo reply webhook can flip status to Connected
+      if (listResult?.priorityFieldValueId && listResult?.connectedOptionId && companyData?.domain) {
+        tracker.saveTracking(companyData.domain, {
+          priorityFieldValueId: listResult.priorityFieldValueId,
+          connectedOptionId: listResult.connectedOptionId,
+          orgId: org.id,
+        });
+      }
     } catch (e) {
       results.errors.push(`Affinity sync: ${e.message}`);
     }

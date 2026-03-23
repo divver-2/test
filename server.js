@@ -6,6 +6,7 @@ const { runOutreachSequence, runOutreachByCompany, launchEmailOutreach } = requi
 const { buildEmailSequence } = require('./src/emailGenerator');
 const apollo = require('./src/apollo');
 const affinity = require('./src/affinity');
+const tracker = require('./src/outreachTracker');
 
 const app = express();
 app.use(cors());
@@ -162,6 +163,66 @@ app.post('/api/affinity/mark-connected', async (req, res) => {
     res.json({ success: true });
   } catch (err) {
     res.status(500).json({ error: err.message });
+  }
+});
+
+// Apollo webhook — fired when a contact replies to a sequence email
+// Configure in Apollo: Settings → Webhooks → add URL: <your-host>/api/webhooks/apollo
+// Event type to subscribe to: emailer_message.replied (or similar — verify in Apollo's webhook docs)
+app.post('/api/webhooks/apollo', async (req, res) => {
+  // Acknowledge immediately so Apollo doesn't retry
+  res.json({ received: true });
+
+  try {
+    const payload = req.body;
+    const eventType = payload?.event_type || payload?.type || '';
+    console.log('[Apollo Webhook] event:', eventType);
+
+    // Only act on reply events
+    const isReply =
+      eventType.includes('replied') ||
+      eventType.includes('reply') ||
+      eventType === 'emailer_message.replied';
+
+    if (!isReply) return;
+
+    // Extract the contact email from the webhook payload (Apollo may nest it differently)
+    const contactEmail =
+      payload?.contact?.email ||
+      payload?.emailer_message?.contact?.email ||
+      payload?.data?.contact?.email ||
+      null;
+
+    if (!contactEmail) {
+      console.warn('[Apollo Webhook] Reply event received but no contact email found in payload');
+      return;
+    }
+
+    const domain = contactEmail.split('@')[1]?.toLowerCase();
+    if (!domain) return;
+
+    console.log(`[Apollo Webhook] Reply from ${contactEmail} (domain: ${domain}) — looking up Affinity IDs`);
+
+    const tracked = tracker.getTracking(domain);
+    if (!tracked) {
+      console.warn(`[Apollo Webhook] No Affinity tracking data found for domain: ${domain}`);
+      return;
+    }
+
+    const affinityKey = process.env.AFFINITY_API_KEY;
+    if (!affinityKey) {
+      console.error('[Apollo Webhook] AFFINITY_API_KEY not set — cannot update status');
+      return;
+    }
+
+    await affinity.markConnected({
+      priorityFieldValueId: tracked.priorityFieldValueId,
+      connectedOptionId: tracked.connectedOptionId,
+    }, affinityKey);
+
+    console.log(`[Apollo Webhook] Affinity status updated to Connected for domain: ${domain} (orgId: ${tracked.orgId})`);
+  } catch (e) {
+    console.error('[Apollo Webhook] Error processing reply event:', e.message);
   }
 });
 

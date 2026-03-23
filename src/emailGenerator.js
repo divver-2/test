@@ -2,7 +2,7 @@
 
 const Anthropic = require('@anthropic-ai/sdk');
 
-const FOLLOWUP_DELAY_DAYS = 35; // 5 weeks
+const FOLLOWUP_DELAY_DAYS = 42; // 6 weeks
 
 function getDomain(email) {
   return email.split('@')[1];
@@ -154,6 +154,17 @@ If anything changes and you'd like to chat, my door is always open. Feel free to
 Best,
 ${senderName || 'Your Name'}`,
     },
+    {
+      subject: `Still here if the timing is ever right`,
+      body: `Hi ${firstName},
+
+Just leaving the door open — no pressure at all. If there's ever a moment where connecting makes sense, you know where to find me.
+
+Wishing ${companyName || 'you and the team'} continued success.
+
+Best,
+${senderName || 'Your Name'}`,
+    },
   ];
 
   return templates[Math.min(followUpIndex, templates.length - 1)];
@@ -166,8 +177,8 @@ async function buildEmailSequence({ ceoName, companyName, industry, description,
   const initial = await generateInitialEmail({ ceoName, companyName, industry, description, senderName });
   emails.push({ ...initial, delayDays: 0, type: 'initial' });
 
-  // Emails 2-5: Follow-ups every 35 days (5 weeks)
-  for (let i = 0; i < 4; i++) {
+  // Emails 2-6: Follow-ups every 42 days (6 weeks)
+  for (let i = 0; i < 5; i++) {
     const followUp = generateFollowUps({ ceoName, companyName, senderName, followUpIndex: i });
     emails.push({ ...followUp, delayDays: FOLLOWUP_DELAY_DAYS * (i + 1), type: `followup_${i + 1}` });
   }
