@@ -227,13 +227,24 @@ async function createSequenceWithSteps(sequenceName, emailSequence, emailAccount
   return { campaign, stepResults };
 }
 
+// Get all steps for a sequence, ordered by position
+async function getSequenceSteps(sequenceId, apiKey) {
+  const res = await axios.get(
+    `${APOLLO_BASE}/emailer_campaigns/${sequenceId}/emailer_steps`,
+    { headers: getHeaders(apiKey) }
+  );
+  return res.data.emailer_steps || [];
+}
+
 // Add a contact to a sequence (enrolls them — triggers sending)
-async function addContactToSequence(sequenceId, contactId, emailAccountId, apiKey) {
+// Pass startingStepId to enroll at a specific step rather than step 1
+async function addContactToSequence(sequenceId, contactId, emailAccountId, apiKey, startingStepId = null) {
   const payload = {
     contact_ids: [contactId],
     emailer_campaign_id: sequenceId,
   };
   if (emailAccountId) payload.send_email_from_email_account_id = emailAccountId;
+  if (startingStepId) payload.starting_emailer_step_id = startingStepId;
 
   const res = await axios.post(
     `${APOLLO_BASE}/emailer_campaigns/${sequenceId}/add_contact_ids`,
@@ -393,6 +404,7 @@ module.exports = {
   createSequence,
   createSequenceWithSteps,
   addSequenceStep,
+  getSequenceSteps,
   addContactToSequence,
   getEmailAccounts,
   getCompanyEmailActivity,
