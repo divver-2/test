@@ -4,7 +4,7 @@ const hunter = require('./hunter');
 const { buildEmailSequence, FOLLOWUP_DELAY_DAYS } = require('./emailGenerator');
 const tracker = require('./outreachTracker');
 
-const SEQUENCE_NAME_PREFIX = 'CEO Outreach —';
+const SEQUENCE_NAME = 'CEO Outreach';
 
 // Main orchestration: look up contact, generate emails, create sequence in Apollo CRM
 async function runOutreachSequence({ email, senderName, apiKey }) {
@@ -138,14 +138,13 @@ async function runOutreachSequence({ email, senderName, apiKey }) {
 
   // 9. Find or create the Apollo sequence (with email steps)
   try {
-    const sequenceName = `${SEQUENCE_NAME_PREFIX} ${orgName}`;
     const emailAccounts = await apollo.getEmailAccounts(apiKey);
     const emailAccountId = emailAccounts[0]?.id || null;
-    const existing = await apollo.searchSequences(sequenceName, apiKey);
+    const existing = (await apollo.searchSequences(SEQUENCE_NAME, apiKey)).filter(s => s.name === SEQUENCE_NAME);
     if (existing.length > 0) {
       results.apolloSequence = { ...existing[0], alreadyExisted: true };
     } else {
-      const { campaign } = await apollo.createSequenceWithSteps(sequenceName, results.emailSequence, emailAccountId, apiKey);
+      const { campaign } = await apollo.createSequenceWithSteps(SEQUENCE_NAME, results.emailSequence, emailAccountId, apiKey);
       results.apolloSequence = campaign;
     }
   } catch (e) {
@@ -439,41 +438,21 @@ async function launchEmailOutreach({ companyData, ceoData, emailSequence, apiKey
     return { success: false, ...results };
   }
 
-  // 4. Create sequence with all email steps (or find existing)
-  const sequenceName = `${SEQUENCE_NAME_PREFIX} ${companyData?.name || 'Unknown'}`;
+  // 4. Find the shared "CEO Outreach" sequence
   try {
-    const existing = (await apollo.searchSequences(sequenceName, apiKey)).filter(s => s.name === sequenceName);
-    if (existing.length > 0) {
-      console.log('[launchEmailOutreach] Found existing sequence:', existing[0].id, existing[0].name);
-      results.sequence = { ...existing[0], _existingSequence: true };
-    } else {
-      const { campaign, stepResults } = await apollo.createSequenceWithSteps(
-        sequenceName, emailSequence, emailAccountId, apiKey
-      );
-      results.sequence = campaign;
-      console.log('[launchEmailOutreach] Created new sequence:', campaign.id, campaign.name);
-      const failedSteps = stepResults.filter(s => !s.ok);
-      if (failedSteps.length > 0) {
-        results.errors.push(`${failedSteps.length} email step(s) failed to create: ${failedSteps.map(s => s.error).join(', ')}`);
-      }
-    }
+    const existing = (await apollo.searchSequences(SEQUENCE_NAME, apiKey)).filter(s => s.name === SEQUENCE_NAME);
+    if (existing.length === 0) throw new Error(`Sequence "${SEQUENCE_NAME}" not found in Apollo`);
+    console.log('[launchEmailOutreach] Found sequence:', existing[0].id, existing[0].name);
+    results.sequence = existing[0];
   } catch (e) {
     results.errors.push(`Sequence: ${e.response?.data?.message || e.message}`);
     return { success: false, ...results };
   }
 
-  // 5. Enroll contact in sequence starting at step 2 (initial email already sent manually)
-  // Brief delay after fresh sequence creation — Apollo needs a moment to commit steps before enrollment
-  if (!results.sequence._existingSequence) {
-    await new Promise(r => setTimeout(r, 2000));
-  }
+  // 5. Enroll contact in sequence — Apollo auto-runs from step 1
   try {
-    const steps = await apollo.getSequenceSteps(results.sequence.id, apiKey);
-    console.log('[launchEmailOutreach] Steps fetched:', steps.map(s => ({ id: s.id, position: s.position, type: s.type })));
-    const startingStepId = steps[1]?.id;
-    if (!startingStepId) throw new Error('Step 2 not found in sequence — cannot enroll without risking sending email 1 again');
-    console.log('[launchEmailOutreach] Enrolling — sequenceId:', results.sequence.id, 'contactId:', results.contact.id, 'emailAccountId:', emailAccountId, 'startingStepId:', startingStepId);
-    await apollo.addContactToSequence(results.sequence.id, results.contact.id, emailAccountId, apiKey, startingStepId);
+    console.log('[launchEmailOutreach] Enrolling — sequenceId:', results.sequence.id, 'contactId:', results.contact.id, 'emailAccountId:', emailAccountId);
+    await apollo.addContactToSequence(results.sequence.id, results.contact.id, emailAccountId, apiKey);
     results.enrolled = true;
   } catch (e) {
     console.error('[launchEmailOutreach] Enrollment error — status:', e.response?.status, 'data:', JSON.stringify(e.response?.data));
