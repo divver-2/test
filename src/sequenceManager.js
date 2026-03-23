@@ -444,7 +444,7 @@ async function launchEmailOutreach({ companyData, ceoData, emailSequence, apiKey
   try {
     const existing = await apollo.searchSequences(sequenceName, apiKey);
     if (existing.length > 0) {
-      results.sequence = existing[0];
+      results.sequence = { ...existing[0], _existingSequence: true };
     } else {
       const { campaign, stepResults } = await apollo.createSequenceWithSteps(
         sequenceName, emailSequence, emailAccountId, apiKey
@@ -461,6 +461,10 @@ async function launchEmailOutreach({ companyData, ceoData, emailSequence, apiKey
   }
 
   // 5. Enroll contact in sequence starting at step 2 (initial email already sent manually)
+  // Brief delay after fresh sequence creation — Apollo needs a moment to commit steps before enrollment
+  if (!results.sequence._existingSequence) {
+    await new Promise(r => setTimeout(r, 2000));
+  }
   try {
     const steps = await apollo.getSequenceSteps(results.sequence.id, apiKey);
     const startingStepId = steps[1]?.id;
