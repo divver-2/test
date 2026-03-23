@@ -462,18 +462,10 @@ async function launchEmailOutreach({ companyData, ceoData, emailSequence, apiKey
 
   // 5. Enroll contact in sequence starting at step 2 (initial email already sent manually)
   try {
-    let startingStepId = null;
-    try {
-      const steps = await apollo.getSequenceSteps(results.sequence.id, apiKey);
-      startingStepId = steps[1]?.id || null;
-      if (startingStepId) {
-        console.log('[launchEmailOutreach] Enrolling at step 2, id:', startingStepId);
-      } else {
-        console.log('[launchEmailOutreach] Step 2 not found, enrolling from step 1');
-      }
-    } catch (e) {
-      console.warn('[launchEmailOutreach] Could not fetch sequence steps:', e.message);
-    }
+    const steps = await apollo.getSequenceSteps(results.sequence.id, apiKey);
+    const startingStepId = steps[1]?.id;
+    if (!startingStepId) throw new Error('Step 2 not found in sequence — cannot enroll without risking sending email 1 again');
+    console.log('[launchEmailOutreach] Enrolling at step 2, id:', startingStepId);
     await apollo.addContactToSequence(results.sequence.id, results.contact.id, emailAccountId, apiKey, startingStepId);
     results.enrolled = true;
   } catch (e) {
