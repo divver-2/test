@@ -166,6 +166,54 @@ app.post('/api/affinity/mark-connected', async (req, res) => {
   }
 });
 
+// Poll Apollo for replies and update Affinity status to Connected
+// Call this manually or it runs automatically every hour
+async function syncRepliesFromApollo() {
+  const apiKey = process.env.APOLLO_API_KEY;
+  const affinityKey = process.env.AFFINITY_API_KEY;
+  if (!apiKey || !affinityKey) return { updated: [], skipped: [], errors: [] };
+
+  const updated = [], skipped = [], errors = [];
+
+  try {
+    const replies = await apollo.pollForReplies(apiKey);
+    console.log(`[poll-replies] Found ${replies.length} replied contact(s) across CEO Outreach sequences`);
+
+    for (const reply of replies) {
+      if (!reply.domain) { skipped.push({ ...reply, reason: 'no domain' }); continue; }
+
+      const tracked = tracker.getTracking(reply.domain);
+      if (!tracked) { skipped.push({ ...reply, reason: 'not in tracker' }); continue; }
+
+      try {
+        await affinity.markConnected({
+          priorityFieldValueId: tracked.priorityFieldValueId,
+          connectedOptionId: tracked.connectedOptionId,
+        }, affinityKey);
+        console.log(`[poll-replies] Marked Connected in Affinity: ${reply.domain}`);
+        updated.push(reply);
+      } catch (e) {
+        errors.push({ ...reply, error: e.message });
+      }
+    }
+  } catch (e) {
+    console.error('[poll-replies] Failed to poll Apollo:', e.message);
+    errors.push({ error: e.message });
+  }
+
+  return { updated, skipped, errors };
+}
+
+// Manual trigger: POST /api/poll-replies
+app.post('/api/poll-replies', async (req, res) => {
+  try {
+    const result = await syncRepliesFromApollo();
+    res.json({ success: true, ...result });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // Apollo webhook — fired when a contact replies to a sequence email
 // Configure in Apollo: Settings → Webhooks → add URL: <your-host>/api/webhooks/apollo
 // Event type to subscribe to: emailer_message.replied (or similar — verify in Apollo's webhook docs)
@@ -232,4 +280,14 @@ app.get('/api/health', (_, res) => res.json({ ok: true }));
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   console.log(`\nCEO Outreach Tool running at http://localhost:${PORT}\n`);
+
+  // Poll Apollo for replies every hour and sync Affinity status automatically
+  const POLL_INTERVAL_MS = 60 * 60 * 1000; // 1 hour
+  setInterval(async () => {
+    console.log('[auto-poll] Checking Apollo for replies...');
+    const result = await syncRepliesFromApollo();
+    if (result.updated.length > 0) {
+      console.log(`[auto-poll] Updated ${result.updated.length} Affinity record(s) to Connected`);
+    }
+  }, POLL_INTERVAL_MS);
 });

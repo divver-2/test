@@ -331,6 +331,55 @@ async function upsertAccount(orgData, apiKey) {
   return res.data.account;
 }
 
+// Get contacts enrolled in a sequence with a specific status (e.g. "replied")
+async function getSequenceContacts(sequenceId, apiKey, statusFilter = null) {
+  const params = { per_page: 100 };
+  if (statusFilter) params['contact_email_campaign_statuses[]'] = statusFilter;
+
+  const res = await axios.get(
+    `${APOLLO_BASE}/emailer_campaigns/${sequenceId}/emailer_contacts`,
+    { params, headers: getHeaders(apiKey) }
+  );
+  // Apollo returns { emailer_contacts: [...] } each with contact + emailer_contact_status
+  return res.data.emailer_contacts || [];
+}
+
+// Poll all CEO Outreach sequences for replied contacts
+// Returns array of { email, domain, sequenceId, sequenceName, repliedAt }
+async function pollForReplies(apiKey) {
+  const sequences = await searchSequences('CEO Outreach', apiKey);
+  const replied = [];
+
+  for (const seq of sequences) {
+    try {
+      const contacts = await getSequenceContacts(seq.id, apiKey);
+      for (const ec of contacts) {
+        const status = (ec.emailer_contact_status || ec.status || '').toLowerCase();
+        if (status === 'replied') {
+          const email =
+            ec.contact?.email ||
+            ec.contact?.work_email ||
+            ec.email ||
+            null;
+          if (email) {
+            replied.push({
+              email,
+              domain: email.split('@')[1]?.toLowerCase() || null,
+              sequenceId: seq.id,
+              sequenceName: seq.name,
+              repliedAt: ec.replied_at || ec.updated_at || null,
+            });
+          }
+        }
+      }
+    } catch (e) {
+      console.warn(`[Apollo] pollForReplies: failed to get contacts for sequence ${seq.id}:`, e.response?.data?.message || e.message);
+    }
+  }
+
+  return replied;
+}
+
 module.exports = {
   enrichContact,
   enrichOrganization,
@@ -347,4 +396,6 @@ module.exports = {
   addContactToSequence,
   getEmailAccounts,
   getCompanyEmailActivity,
+  getSequenceContacts,
+  pollForReplies,
 };
