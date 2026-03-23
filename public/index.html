@@ -442,6 +442,7 @@
       <div class="draft-actions">
         <button class="btn-copy" onclick="copyEmail()">Copy Email</button>
         <a class="btn-mailto" id="mailtoLink" href="#">Open in Email App</a>
+        <button class="btn btn-primary" id="launchBtn" onclick="launchOutreach()" style="padding:8px 18px;font-size:0.85rem">Launch in Apollo</button>
       </div>
     </div>
   </div>
@@ -476,6 +477,7 @@
 // ── State ────────────────────────────────────────────────
 let history = [];
 try { history = JSON.parse(localStorage.getItem('outreach_history') || '[]'); } catch(e) {}
+let currentResult = null;
 
 // ── Helpers ───────────────────────────────────────────────
 function esc(s) {
@@ -538,6 +540,7 @@ async function addCompany() {
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || 'Lookup failed');
 
+    currentResult = data;
     renderResult(data);
 
     const entry = {
@@ -808,6 +811,65 @@ async function markConnected(historyIdx) {
     btn.disabled = false;
     btn.textContent = 'Mark Connected';
     alert('Could not update Affinity: ' + e.message);
+  }
+}
+
+// ── Launch outreach ───────────────────────────────────────
+async function launchOutreach() {
+  if (!currentResult) return;
+
+  const apiKey = getApiKey();
+  if (!apiKey) { setStatus('Please enter your Apollo API key in Settings (⚙ top right).', 'error'); return; }
+
+  if (!currentResult.ceo?.email) {
+    setStatus('No CEO email found — cannot launch outreach.', 'error');
+    return;
+  }
+
+  const btn = document.getElementById('launchBtn');
+  btn.disabled = true;
+  btn.textContent = 'Launching…';
+
+  try {
+    const res = await fetch('/api/send-outreach', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        companyData: currentResult.company,
+        ceoData: currentResult.ceo,
+        emailSequence: currentResult.emailSequence,
+        apiKey,
+      }),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Launch failed');
+
+    const sendStatusEl = document.getElementById('sendStatus');
+    if (data.enrolled) {
+      sendStatusEl.innerHTML = `<div class="send-status send-status-ok" style="margin:0 0 14px">
+        <span class="send-status-icon">✅</span>
+        <div>
+          <div>Sequence launched in Apollo</div>
+          <div class="send-status-sub">${esc(currentResult.ceo.email)} enrolled — follow-ups will send automatically</div>
+        </div>
+      </div>`;
+      btn.textContent = 'Launched';
+    } else {
+      const errs = data.errors?.join(', ') || 'Unknown error';
+      sendStatusEl.innerHTML = `<div class="send-status send-status-warn" style="margin:0 0 14px">
+        <span class="send-status-icon">⚠️</span>
+        <div>
+          <div>Partial launch</div>
+          <div class="send-status-sub">${esc(errs)}</div>
+        </div>
+      </div>`;
+      btn.disabled = false;
+      btn.textContent = 'Retry';
+    }
+  } catch(e) {
+    setStatus('Launch error: ' + e.message, 'error');
+    btn.disabled = false;
+    btn.textContent = 'Launch in Apollo';
   }
 }
 
