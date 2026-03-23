@@ -62,6 +62,7 @@ async function runOutreachSequence({ email, senderName, apiKey }) {
     ceoName,
     companyName: orgName,
     industry,
+    description: results.organization?.short_description || '',
     senderName,
   });
 
@@ -330,6 +331,7 @@ async function runOutreachByCompany({ companyName, apiKey, affinityKey }) {
     ceoName,
     companyName: orgName,
     industry: results.organization?.industry || '',
+    description: results.organization?.short_description || '',
     senderName: 'David Divver',
   });
 

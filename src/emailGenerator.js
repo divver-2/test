@@ -11,35 +11,37 @@ function capitalize(str) {
   return str.charAt(0).toUpperCase() + str.slice(1);
 }
 
-function getIndustryLine(industry) {
-  if (!industry) return '';
-  const lines = {
-    'Technology': 'the fast-moving tech landscape',
-    'SaaS': 'the SaaS space',
-    'Financial Services': 'financial services',
-    'Healthcare': 'the healthcare sector',
+function getSpaceLine(industry) {
+  const spaces = {
+    'Technology': 'enterprise technology',
+    'SaaS': 'SaaS',
+    'Financial Services': 'fintech',
+    'Healthcare': 'healthtech',
     'E-Commerce': 'e-commerce',
-    'Marketing': 'the marketing world',
+    'Marketing': 'marketing technology',
+    'Artificial Intelligence': 'AI',
+    'Data Analytics': 'data and analytics',
+    'Cybersecurity': 'cybersecurity',
+    'Developer Tools': 'developer tools',
   };
-  return lines[industry] || `the ${industry.toLowerCase()} industry`;
+  return spaces[industry] || (industry ? industry.toLowerCase() : 'this space');
 }
 
-function generateInitialEmail({ ceoName, companyName, industry, senderName }) {
-  const industryLine = getIndustryLine(industry);
-  const greeting = ceoName ? `Hi ${ceoName.split(' ')[0]},` : 'Hi,';
+function generateInitialEmail({ ceoName, companyName, industry, description, senderName }) {
+  const space = getSpaceLine(industry);
+  const senderFirst = senderName ? senderName.split(' ')[0] : 'David';
+
+  const companyLine = description
+    ? `I've heard a lot of positive feedback on ${companyName || 'your company'}, specifically around ${description.charAt(0).toLowerCase() + description.slice(1).replace(/\.$/, '')}, and am very impressed with what you are building.`
+    : `I've heard a lot of positive feedback on ${companyName || 'your company'} and am very impressed with what you are building.`;
 
   return {
-    subject: `Quick question for you, ${ceoName ? ceoName.split(' ')[0] : 'there'}`,
-    body: `${greeting}
-
-I came across ${companyName || 'your company'} and was impressed by what you're building${industryLine ? ` in ${industryLine}` : ''}.
-
-I'm reaching out because I think there's a real opportunity for us to work together — specifically around [YOUR VALUE PROP HERE]. Companies like yours have seen [SPECIFIC RESULT, e.g., 30% faster pipeline, 2x conversion] after working with us.
-
-Would you be open to a 15-minute call this week or next to see if there's a fit?
-
-Looking forward to your thoughts,
-${senderName || 'Your Name'}`,
+    subject: `Connecting from NewView Capital`,
+    body: `Hope all is well, I'm an investor at NewView Capital - a $3.1bn venture growth fund.
+I wanted to reach out as I've been spending time in ${space} and believe it will become a key point of differentiation going forward. ${companyLine}
+I'm excited about what you are doing and wanted to see if it was a good time to connect.
+Thanks,
+${senderFirst}`,
   };
 }
 
@@ -99,11 +101,11 @@ ${senderName || 'Your Name'}`,
   return templates[Math.min(followUpIndex, templates.length - 1)];
 }
 
-function buildEmailSequence({ ceoName, companyName, industry, senderName }) {
+function buildEmailSequence({ ceoName, companyName, industry, description, senderName }) {
   const emails = [];
 
   // Email 1: Initial outreach (day 0)
-  const initial = generateInitialEmail({ ceoName, companyName, industry, senderName });
+  const initial = generateInitialEmail({ ceoName, companyName, industry, description, senderName });
   emails.push({ ...initial, delayDays: 0, type: 'initial' });
 
   // Emails 2-5: Follow-ups every 35 days (5 weeks)
