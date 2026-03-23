@@ -29,9 +29,13 @@ function getThemeLine(industry) {
   return themes[industry] || `I've been spending time in ${industry ? industry.toLowerCase() : 'this space'} and find the opportunity here particularly compelling`;
 }
 
-async function generateProductLine({ companyName, industry, description }) {
+async function generateEmailLines({ companyName, industry, description }) {
   const apiKey = process.env.ANTHROPIC_API_KEY;
-  if (!apiKey) return `I've heard strong feedback on what you are building.`;
+  const fallback = {
+    themeLine: getThemeLine(industry),
+    productLine: `I've heard strong feedback on what you are building.`,
+  };
+  if (!apiKey) return fallback;
 
   try {
     const client = new Anthropic({ apiKey });
@@ -43,32 +47,40 @@ async function generateProductLine({ companyName, industry, description }) {
 
     const msg = await client.messages.create({
       model: 'claude-sonnet-4-6',
-      max_tokens: 80,
+      max_tokens: 150,
       messages: [{
         role: 'user',
-        content: `You are writing one sentence for a VC investor's outreach email. The sentence completes: "I've heard strong feedback on..."
+        content: `You are helping a VC investor at NewView Capital write a short, personalized outreach email to a founder.
 
-Write a single, specific sentence (max 20 words after "I've heard strong feedback on") that captures a compelling, concrete insight about what this company does — focused on the value they deliver or the problem they uniquely solve. Do NOT give a generic company overview. Sound like an investor who has done research.
+Write exactly two lines, separated by a newline:
+
+LINE 1 — Investing theme (completes "I wanted to reach out as ..."): One sentence about the investor's thesis or angle that led them to this company. Should feel specific and genuine — like "I've been spending time in voice AI and believe it will become a key point of data capture" or "I find the opportunity to bring AI to essential service industries particularly compelling". Max 25 words.
+
+LINE 2 — Product insight (completes "I've heard strong feedback on ..."): One specific sentence about what this company does well or the problem they uniquely solve — focused on their product value, not a company overview. Sound like someone who has done research. Max 20 words.
 
 ${context}
 
-Reply with only the full sentence starting with "I've heard strong feedback on". No quotes, no explanation.`,
+Reply with exactly two lines. No labels, no quotes, no explanation.`,
       }],
     });
-    return msg.content[0].text.trim();
+
+    const lines = msg.content[0].text.trim().split('\n').map(l => l.trim()).filter(Boolean);
+    return {
+      themeLine: lines[0] || fallback.themeLine,
+      productLine: lines[1] || fallback.productLine,
+    };
   } catch (e) {
-    console.error('[Claude] product line generation failed:', e.message);
-    return `I've heard strong feedback on what you are building.`;
+    console.error('[Claude] email line generation failed:', e.message);
+    return fallback;
   }
 }
 
 async function generateInitialEmail({ ceoName, companyName, industry, description, senderName }) {
-  const themeLine = getThemeLine(industry);
   const senderFirst = senderName ? senderName.split(' ')[0] : 'David';
   const firstName = ceoName ? ceoName.split(' ')[0] : null;
   const greeting = firstName ? `Hi ${firstName},` : 'Hi,';
 
-  const productLine = await generateProductLine({ companyName, industry, description });
+  const { themeLine, productLine } = await generateEmailLines({ companyName, industry, description });
 
   return {
     subject: `Connecting from NewView Capital`,
