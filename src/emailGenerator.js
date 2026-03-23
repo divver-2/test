@@ -29,70 +29,72 @@ function getThemeLine(industry) {
   return themes[industry] || `I've been spending time in ${industry ? industry.toLowerCase() : 'this space'} and find the opportunity here particularly compelling`;
 }
 
-async function generateEmailLines({ companyName, industry, description }) {
-  const apiKey = process.env.ANTHROPIC_API_KEY;
-  const fallback = {
-    themeLine: getThemeLine(industry),
-    productLine: `I've heard strong feedback on what you are building.`,
-  };
-  if (!apiKey) return fallback;
-
-  try {
-    const client = new Anthropic({ apiKey });
-    const context = [
-      companyName && `Company: ${companyName}`,
-      industry && `Industry: ${industry}`,
-      description && `Description: ${description}`,
-    ].filter(Boolean).join('\n');
-
-    const msg = await client.messages.create({
-      model: 'claude-sonnet-4-6',
-      max_tokens: 200,
-      messages: [{
-        role: 'user',
-        content: `You are helping a VC investor at NewView Capital write a short, personalized outreach email to a founder.
-
-Write two lines in exactly this format:
-THEME: [one sentence completing "I wanted to reach out as ..."]
-PRODUCT: [one sentence completing "I've heard strong feedback on ..."]
-
-THEME rules: Specific investing angle that led to this company. Sound like a thoughtful investor — e.g. "I've been spending time in voice AI and believe it will become a key point of data capture" or "I find the opportunity to bring AI to essential service industries particularly compelling". Never use generic industry labels like "information technology". Max 25 words.
-
-PRODUCT rules: One concrete sentence about what makes this company's product valuable or what problem they uniquely solve. Not a company overview. Max 20 words.
-
-${context}
-
-Reply with exactly two lines starting with THEME: and PRODUCT:`,
-      }],
-    });
-
-    const text = msg.content[0].text.trim();
-    const themeMatch = text.match(/^THEME:\s*(.+)$/m);
-    const productMatch = text.match(/^PRODUCT:\s*(.+)$/m);
-    return {
-      themeLine: themeMatch ? themeMatch[1].trim() : fallback.themeLine,
-      productLine: productMatch ? productMatch[1].trim() : fallback.productLine,
-    };
-  } catch (e) {
-    console.error('[Claude] email line generation failed:', e.message);
-    return fallback;
-  }
-}
-
 async function generateInitialEmail({ ceoName, companyName, industry, description, senderName }) {
   const senderFirst = senderName ? senderName.split(' ')[0] : 'David';
   const firstName = ceoName ? ceoName.split(' ')[0] : null;
   const greeting = firstName ? `Hi ${firstName},` : 'Hi,';
 
-  const { themeLine, productLine } = await generateEmailLines({ companyName, industry, description });
+  const apiKey = process.env.ANTHROPIC_API_KEY;
 
+  if (apiKey) {
+    try {
+      const client = new Anthropic({ apiKey });
+      const context = [
+        companyName && `Company: ${companyName}`,
+        industry && `Industry: ${industry}`,
+        description && `Description: ${description}`,
+      ].filter(Boolean).join('\n');
+
+      const msg = await client.messages.create({
+        model: 'claude-sonnet-4-6',
+        max_tokens: 300,
+        messages: [{
+          role: 'user',
+          content: `You are writing a short VC investor outreach email on behalf of David at NewView Capital ($3.1B venture growth fund) to a founder.
+
+Write the complete email body in exactly this format — do not change the fixed lines, only fill in the two bracketed parts:
+
+---
+${greeting}
+
+Hope all is well. I'm an investor at NewView Capital, a $3.1B venture growth fund.
+
+I wanted to reach out as [THEME]. ${companyName || 'Your company'} is a great example of that and I've heard strong feedback on [PRODUCT].
+
+I'm excited about what you are building and wanted to see if it was a good time to connect.
+
+Thanks,
+${senderFirst}
+---
+
+[THEME] — one sentence on David's investing angle that naturally leads to this company. Specific and genuine, like "I've been spending time in voice AI and believe it will become a key point of data capture" or "I find the opportunity to bring AI to essential service industries particularly compelling". Never use generic labels like "information technology". Max 25 words.
+
+[PRODUCT] — one specific sentence about what makes this company's product valuable or the problem they uniquely solve. Concrete, not a company overview. Max 20 words.
+
+${context}
+
+Reply with only the completed email, no explanation.`,
+        }],
+      });
+
+      return {
+        subject: `Connecting from NewView Capital`,
+        body: msg.content[0].text.trim(),
+      };
+    } catch (e) {
+      console.error('[Claude] email generation failed:', e.message);
+    }
+  }
+
+  // Fallback if no API key or Claude fails
+  const themeLine = getThemeLine(industry);
   return {
     subject: `Connecting from NewView Capital`,
     body: `${greeting}
 
 Hope all is well. I'm an investor at NewView Capital, a $3.1B venture growth fund.
 
-I wanted to reach out as ${themeLine}. ${companyName || 'Your company'} is a great example of that and ${productLine}
+I wanted to reach out as ${themeLine}. ${companyName || 'Your company'} is a great example of that and I've heard strong feedback on what you are building.
 
 I'm excited about what you are building and wanted to see if it was a good time to connect.
 
