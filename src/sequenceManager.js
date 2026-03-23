@@ -467,12 +467,14 @@ async function launchEmailOutreach({ companyData, ceoData, emailSequence, apiKey
   }
   try {
     const steps = await apollo.getSequenceSteps(results.sequence.id, apiKey);
+    console.log('[launchEmailOutreach] Steps fetched:', steps.map(s => ({ id: s.id, position: s.position, type: s.type })));
     const startingStepId = steps[1]?.id;
     if (!startingStepId) throw new Error('Step 2 not found in sequence — cannot enroll without risking sending email 1 again');
-    console.log('[launchEmailOutreach] Enrolling at step 2, id:', startingStepId);
+    console.log('[launchEmailOutreach] Enrolling — sequenceId:', results.sequence.id, 'contactId:', results.contact.id, 'emailAccountId:', emailAccountId, 'startingStepId:', startingStepId);
     await apollo.addContactToSequence(results.sequence.id, results.contact.id, emailAccountId, apiKey, startingStepId);
     results.enrolled = true;
   } catch (e) {
+    console.error('[launchEmailOutreach] Enrollment error — status:', e.response?.status, 'data:', JSON.stringify(e.response?.data));
     results.errors.push(`Enrollment: ${e.response?.data?.message || e.message}`);
   }
 
