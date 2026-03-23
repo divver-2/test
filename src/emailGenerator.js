@@ -1,5 +1,7 @@
 // Generates personalized CEO outreach emails based on enriched company/person data
 
+const Anthropic = require('@anthropic-ai/sdk');
+
 const FOLLOWUP_DELAY_DAYS = 35; // 5 weeks
 
 function getDomain(email) {
@@ -27,13 +29,46 @@ function getThemeLine(industry) {
   return themes[industry] || `I've been spending time in ${industry ? industry.toLowerCase() : 'this space'} and find the opportunity here particularly compelling`;
 }
 
-function generateInitialEmail({ ceoName, companyName, industry, description, senderName }) {
+async function generateProductLine({ companyName, industry, description }) {
+  const apiKey = process.env.ANTHROPIC_API_KEY;
+  if (!apiKey) return `I've heard strong feedback on what you are building.`;
+
+  try {
+    const client = new Anthropic({ apiKey });
+    const context = [
+      companyName && `Company: ${companyName}`,
+      industry && `Industry: ${industry}`,
+      description && `Description: ${description}`,
+    ].filter(Boolean).join('\n');
+
+    const msg = await client.messages.create({
+      model: 'claude-sonnet-4-6',
+      max_tokens: 80,
+      messages: [{
+        role: 'user',
+        content: `You are writing one sentence for a VC investor's outreach email. The sentence completes: "I've heard strong feedback on..."
+
+Write a single, specific sentence (max 20 words after "I've heard strong feedback on") that captures a compelling, concrete insight about what this company does — focused on the value they deliver or the problem they uniquely solve. Do NOT give a generic company overview. Sound like an investor who has done research.
+
+${context}
+
+Reply with only the full sentence starting with "I've heard strong feedback on". No quotes, no explanation.`,
+      }],
+    });
+    return msg.content[0].text.trim();
+  } catch (e) {
+    console.error('[Claude] product line generation failed:', e.message);
+    return `I've heard strong feedback on what you are building.`;
+  }
+}
+
+async function generateInitialEmail({ ceoName, companyName, industry, description, senderName }) {
   const themeLine = getThemeLine(industry);
   const senderFirst = senderName ? senderName.split(' ')[0] : 'David';
   const firstName = ceoName ? ceoName.split(' ')[0] : null;
   const greeting = firstName ? `Hi ${firstName},` : 'Hi,';
 
-  const productLine = `I've heard strong feedback on [specific insight about what they're building — e.g. their ability to X / the way they're solving Y].`;
+  const productLine = await generateProductLine({ companyName, industry, description });
 
   return {
     subject: `Connecting from NewView Capital`,
@@ -106,11 +141,11 @@ ${senderName || 'Your Name'}`,
   return templates[Math.min(followUpIndex, templates.length - 1)];
 }
 
-function buildEmailSequence({ ceoName, companyName, industry, description, senderName }) {
+async function buildEmailSequence({ ceoName, companyName, industry, description, senderName }) {
   const emails = [];
 
   // Email 1: Initial outreach (day 0)
-  const initial = generateInitialEmail({ ceoName, companyName, industry, description, senderName });
+  const initial = await generateInitialEmail({ ceoName, companyName, industry, description, senderName });
   emails.push({ ...initial, delayDays: 0, type: 'initial' });
 
   // Emails 2-5: Follow-ups every 35 days (5 weeks)

@@ -58,7 +58,7 @@ async function runOutreachSequence({ email, senderName, apiKey }) {
   const ceoEmail = results.ceo?.email || results.ceo?.work_email || results.ceo?.personal_emails?.[0] || null;
 
   // 5. Generate the email sequence
-  results.emailSequence = buildEmailSequence({
+  results.emailSequence = await buildEmailSequence({
     ceoName,
     companyName: orgName,
     industry,
@@ -327,7 +327,7 @@ async function runOutreachByCompany({ companyName, apiKey, affinityKey }) {
     null;
 
   // 4. Generate proposed email
-  const emailSequence = buildEmailSequence({
+  const emailSequence = await buildEmailSequence({
     ceoName,
     companyName: orgName,
     industry: results.organization?.industry || '',
