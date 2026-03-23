@@ -444,12 +444,14 @@ async function launchEmailOutreach({ companyData, ceoData, emailSequence, apiKey
   try {
     const existing = await apollo.searchSequences(sequenceName, apiKey);
     if (existing.length > 0) {
+      console.log('[launchEmailOutreach] Found existing sequence:', existing[0].id, existing[0].name);
       results.sequence = { ...existing[0], _existingSequence: true };
     } else {
       const { campaign, stepResults } = await apollo.createSequenceWithSteps(
         sequenceName, emailSequence, emailAccountId, apiKey
       );
       results.sequence = campaign;
+      console.log('[launchEmailOutreach] Created new sequence:', campaign.id, campaign.name);
       const failedSteps = stepResults.filter(s => !s.ok);
       if (failedSteps.length > 0) {
         results.errors.push(`${failedSteps.length} email step(s) failed to create: ${failedSteps.map(s => s.error).join(', ')}`);
