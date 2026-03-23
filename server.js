@@ -2,6 +2,7 @@ require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 const path = require('path');
+const Anthropic = require('@anthropic-ai/sdk');
 const { runOutreachSequence, runOutreachByCompany, launchEmailOutreach } = require('./src/sequenceManager');
 const { buildEmailSequence } = require('./src/emailGenerator');
 const apollo = require('./src/apollo');
@@ -45,6 +46,47 @@ app.post('/api/send-outreach', async (req, res) => {
     res.json(result);
   } catch (err) {
     console.error('[/api/send-outreach] Error:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Improve email — rewrites the current draft based on a plain-english instruction
+app.post('/api/improve-email', async (req, res) => {
+  const { subject, body, instruction, companyName, ceoName, industry } = req.body;
+  if (!body || !instruction) return res.status(400).json({ error: 'body and instruction are required' });
+
+  const apiKey = process.env.ANTHROPIC_API_KEY;
+  if (!apiKey) return res.status(400).json({ error: 'ANTHROPIC_API_KEY not configured' });
+
+  try {
+    const client = new Anthropic({ apiKey });
+    const context = [
+      companyName && `Company: ${companyName}`,
+      industry && `Industry: ${industry}`,
+      ceoName && `CEO: ${ceoName}`,
+    ].filter(Boolean).join('\n');
+
+    const msg = await client.messages.create({
+      model: 'claude-sonnet-4-6',
+      max_tokens: 400,
+      messages: [{
+        role: 'user',
+        content: `You are editing a short VC investor outreach email from David at NewView Capital to a founder.
+
+Current email body:
+${body}
+
+Instruction: ${instruction}
+
+${context}
+
+Rewrite the email following the instruction. Keep it short (4-6 sentences max), keep the same greeting and "Thanks, David" sign-off. Reply with only the rewritten email body, no explanation.`,
+      }],
+    });
+
+    res.json({ subject: subject || 'Connecting from NewView Capital', body: msg.content[0].text.trim() });
+  } catch (err) {
+    console.error('[/api/improve-email] Error:', err.message);
     res.status(500).json({ error: err.message });
   }
 });

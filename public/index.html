@@ -322,6 +322,24 @@
       transition: all 0.15s;
     }
     .btn-mailto:hover { border-color: var(--accent); color: var(--accent-hover); }
+    .improve-row {
+      display: flex; gap: 8px; margin-top: 10px; align-items: center;
+    }
+    .improve-input {
+      flex: 1; background: var(--surface2); border: 1px solid var(--border);
+      border-radius: 8px; padding: 9px 13px; color: var(--text);
+      font-size: 0.85rem; outline: none; transition: border-color 0.15s;
+    }
+    .improve-input:focus { border-color: rgba(255,255,255,0.35); }
+    .improve-input::placeholder { color: var(--muted); opacity: 0.55; }
+    .btn-improve {
+      padding: 9px 16px; border-radius: 8px; cursor: pointer;
+      font-size: 0.85rem; font-weight: 600; white-space: nowrap; flex-shrink: 0;
+      background: var(--surface2); border: 1px solid var(--border); color: var(--muted);
+      transition: all 0.15s;
+    }
+    .btn-improve:hover:not(:disabled) { border-color: rgba(255,255,255,0.35); color: var(--text); }
+    .btn-improve:disabled { opacity: 0.45; cursor: default; }
 
     .hidden { display: none !important; }
 
@@ -439,6 +457,10 @@
         <span id="draftSubject" style="flex:1"></span>
       </div>
       <textarea class="draft-body" id="draftBody"></textarea>
+      <div class="improve-row">
+        <input type="text" id="improveInput" class="improve-input" placeholder="e.g. focus more on AI, make it shorter, be more direct…" onkeydown="if(event.key==='Enter')improveEmail()" />
+        <button class="btn-improve" id="improveBtn" onclick="improveEmail()">✦ Improve</button>
+      </div>
       <div class="draft-actions">
         <button class="btn-copy" onclick="copyEmail()">Copy Email</button>
         <a class="btn-mailto" id="mailtoLink" href="#">Open in Email App</a>
@@ -633,6 +655,52 @@ function copyEmail() {
     btn.textContent = 'Copied!';
     setTimeout(() => btn.textContent = 'Copy Email', 2000);
   });
+}
+
+// ── Improve email via Claude ──────────────────────────────
+async function improveEmail() {
+  if (!currentResult) return;
+  const instruction = document.getElementById('improveInput').value.trim();
+  if (!instruction) { document.getElementById('improveInput').focus(); return; }
+
+  const btn = document.getElementById('improveBtn');
+  btn.disabled = true;
+  btn.textContent = 'Improving…';
+
+  try {
+    const res = await fetch('/api/improve-email', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        subject: document.getElementById('draftSubject').textContent,
+        body: document.getElementById('draftBody').value,
+        instruction,
+        companyName: currentResult.company?.name,
+        ceoName: currentResult.ceo?.name,
+        industry: currentResult.company?.industry,
+      }),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Failed');
+
+    document.getElementById('draftBody').value = data.body;
+    document.getElementById('improveInput').value = '';
+
+    // Keep mailto link in sync
+    const mailto = `mailto:${esc(currentResult.ceo?.email || '')}?subject=${encodeURIComponent(data.subject || '')}&body=${encodeURIComponent(data.body || '')}`;
+    document.getElementById('mailtoLink').href = mailto;
+
+    // Keep emailSequence in sync so Launch uses the improved version
+    if (currentResult.emailSequence?.[0]) {
+      currentResult.emailSequence[0].body = data.body;
+      currentResult.emailSequence[0].subject = data.subject;
+    }
+  } catch (e) {
+    setStatus('Could not improve email: ' + e.message, 'error');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = '✦ Improve';
+  }
 }
 
 // ── Render result card ────────────────────────────────────
