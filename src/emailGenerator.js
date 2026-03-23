@@ -47,27 +47,31 @@ async function generateEmailLines({ companyName, industry, description }) {
 
     const msg = await client.messages.create({
       model: 'claude-sonnet-4-6',
-      max_tokens: 150,
+      max_tokens: 200,
       messages: [{
         role: 'user',
         content: `You are helping a VC investor at NewView Capital write a short, personalized outreach email to a founder.
 
-Write exactly two lines, separated by a newline:
+Write two lines in exactly this format:
+THEME: [one sentence completing "I wanted to reach out as ..."]
+PRODUCT: [one sentence completing "I've heard strong feedback on ..."]
 
-LINE 1 — Investing theme (completes "I wanted to reach out as ..."): One sentence about the investor's thesis or angle that led them to this company. Should feel specific and genuine — like "I've been spending time in voice AI and believe it will become a key point of data capture" or "I find the opportunity to bring AI to essential service industries particularly compelling". Max 25 words.
+THEME rules: Specific investing angle that led to this company. Sound like a thoughtful investor — e.g. "I've been spending time in voice AI and believe it will become a key point of data capture" or "I find the opportunity to bring AI to essential service industries particularly compelling". Never use generic industry labels like "information technology". Max 25 words.
 
-LINE 2 — Product insight (completes "I've heard strong feedback on ..."): One specific sentence about what this company does well or the problem they uniquely solve — focused on their product value, not a company overview. Sound like someone who has done research. Max 20 words.
+PRODUCT rules: One concrete sentence about what makes this company's product valuable or what problem they uniquely solve. Not a company overview. Max 20 words.
 
 ${context}
 
-Reply with exactly two lines. No labels, no quotes, no explanation.`,
+Reply with exactly two lines starting with THEME: and PRODUCT:`,
       }],
     });
 
-    const lines = msg.content[0].text.trim().split('\n').map(l => l.trim()).filter(Boolean);
+    const text = msg.content[0].text.trim();
+    const themeMatch = text.match(/^THEME:\s*(.+)$/m);
+    const productMatch = text.match(/^PRODUCT:\s*(.+)$/m);
     return {
-      themeLine: lines[0] || fallback.themeLine,
-      productLine: lines[1] || fallback.productLine,
+      themeLine: themeMatch ? themeMatch[1].trim() : fallback.themeLine,
+      productLine: productMatch ? productMatch[1].trim() : fallback.productLine,
     };
   } catch (e) {
     console.error('[Claude] email line generation failed:', e.message);
