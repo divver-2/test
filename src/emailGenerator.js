@@ -33,13 +33,7 @@ function generateInitialEmail({ ceoName, companyName, industry, description, sen
   const firstName = ceoName ? ceoName.split(' ')[0] : null;
   const greeting = firstName ? `Hi ${firstName},` : 'Hi,';
 
-  // Use only the first sentence of the description to keep the email concise
-  const firstSentence = description
-    ? description.split(/(?<=[.!?])\s+/)[0].replace(/\.$/, '')
-    : null;
-  const productLine = firstSentence
-    ? `I've heard strong feedback on ${firstSentence.charAt(0).toLowerCase() + firstSentence.slice(1)}.`
-    : `I've heard strong feedback on what you are building.`;
+  const productLine = `I've heard strong feedback on [specific insight about what they're building — e.g. their ability to X / the way they're solving Y].`;
 
   return {
     subject: `Connecting from NewView Capital`,
