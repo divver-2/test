@@ -442,7 +442,7 @@ async function launchEmailOutreach({ companyData, ceoData, emailSequence, apiKey
   // 4. Create sequence with all email steps (or find existing)
   const sequenceName = `${SEQUENCE_NAME_PREFIX} ${companyData?.name || 'Unknown'}`;
   try {
-    const existing = await apollo.searchSequences(sequenceName, apiKey);
+    const existing = (await apollo.searchSequences(sequenceName, apiKey)).filter(s => s.name === sequenceName);
     if (existing.length > 0) {
       console.log('[launchEmailOutreach] Found existing sequence:', existing[0].id, existing[0].name);
       results.sequence = { ...existing[0], _existingSequence: true };
