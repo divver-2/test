@@ -11,35 +11,38 @@ function capitalize(str) {
   return str.charAt(0).toUpperCase() + str.slice(1);
 }
 
-function getSpaceLine(industry) {
-  const spaces = {
-    'Technology': 'enterprise technology',
-    'SaaS': 'SaaS',
-    'Financial Services': 'fintech',
-    'Healthcare': 'healthtech',
-    'E-Commerce': 'e-commerce',
-    'Marketing': 'marketing technology',
-    'Artificial Intelligence': 'AI',
-    'Data Analytics': 'data and analytics',
-    'Cybersecurity': 'cybersecurity',
-    'Developer Tools': 'developer tools',
+function getThemeLine(industry) {
+  const themes = {
+    'Technology': "I've been spending time in enterprise software and believe the next wave of infrastructure is still being built",
+    'SaaS': "I've been spending time in SaaS and find the opportunity to drive operational leverage through software particularly compelling",
+    'Financial Services': "I've been spending time in fintech and believe there is a significant opportunity to modernise how financial services are delivered",
+    'Healthcare': "I've been spending time in healthtech and find the opportunity to bring technology to essential healthcare services particularly compelling",
+    'E-Commerce': "I've been spending time in e-commerce and believe the infrastructure layer powering modern commerce is still maturing",
+    'Marketing': "I've been spending time in marketing technology and believe AI will fundamentally change how brands acquire and retain customers",
+    'Artificial Intelligence': "I've been spending time in AI and believe it will become a key point of data capture and competitive differentiation going forward",
+    'Data Analytics': "I've been spending time in data and analytics and believe companies that turn data into action will define the next era of software",
+    'Cybersecurity': "I've been spending time in cybersecurity and find the opportunity to bring modern, AI-native security to enterprises particularly compelling",
+    'Developer Tools': "I've been spending time in developer tools and believe the way software is built is undergoing a fundamental shift",
   };
-  return spaces[industry] || (industry ? industry.toLowerCase() : 'this space');
+  return themes[industry] || `I've been spending time in ${industry ? industry.toLowerCase() : 'this space'} and find the opportunity here particularly compelling`;
 }
 
 function generateInitialEmail({ ceoName, companyName, industry, description, senderName }) {
-  const space = getSpaceLine(industry);
+  const themeLine = getThemeLine(industry);
   const senderFirst = senderName ? senderName.split(' ')[0] : 'David';
+  const firstName = ceoName ? ceoName.split(' ')[0] : null;
+  const greeting = firstName ? `Hi ${firstName},` : 'Hi,';
 
-  const companyLine = description
-    ? `I've heard a lot of positive feedback on ${companyName || 'your company'}, specifically around ${description.charAt(0).toLowerCase() + description.slice(1).replace(/\.$/, '')}, and am very impressed with what you are building.`
-    : `I've heard a lot of positive feedback on ${companyName || 'your company'} and am very impressed with what you are building.`;
+  const productLine = description
+    ? `I've heard strong feedback on ${description.charAt(0).toLowerCase() + description.slice(1).replace(/\.$/, '')}.`
+    : `I've heard strong feedback on what you are building.`;
 
   return {
     subject: `Connecting from NewView Capital`,
-    body: `Hope all is well, I'm an investor at NewView Capital - a $3.1bn venture growth fund.
-I wanted to reach out as I've been spending time in ${space} and believe it will become a key point of differentiation going forward. ${companyLine}
-I'm excited about what you are doing and wanted to see if it was a good time to connect.
+    body: `${greeting}
+Hope all is well. I'm an investor at NewView Capital, a $3.1B venture growth fund.
+I wanted to reach out as ${themeLine}. ${companyName || 'Your company'} is a great example of that and ${productLine}
+I'm excited about what you are building and wanted to see if it was a good time to connect.
 Thanks,
 ${senderFirst}`,
   };
