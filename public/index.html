@@ -919,11 +919,16 @@ async function launchOutreach() {
 
     const sendStatusEl = document.getElementById('sendStatus');
     if (data.enrolled) {
+      const aff = data.affinity;
+      const affLine = aff?.addedToList
+        ? `Added to <b>${esc(aff.listName || 'sourcing list')}</b> · Status: <b>Chasing</b>${aff.ownerSet ? ' · Owner set' : ''}`
+        : (aff ? `<span style="color:var(--yellow)">⚠ Affinity: ${esc((aff.errors || []).join(', ') || 'not added to list')}</span>` : '');
       sendStatusEl.innerHTML = `<div class="send-status send-status-ok" style="margin:0 0 14px">
         <span class="send-status-icon">✅</span>
         <div>
           <div>Sequence launched in Apollo</div>
           <div class="send-status-sub">${esc(currentResult.ceo.email)} enrolled — follow-ups will send automatically</div>
+          ${affLine ? `<div class="send-status-sub" style="margin-top:4px">${affLine}</div>` : ''}
         </div>
       </div>`;
       btn.textContent = 'Launched';

@@ -169,6 +169,22 @@ async function addOrgToList(listId, orgId, apiKey) {
   return res.data;
 }
 
+// Find an existing list entry for an org (used when add fails because org is already in list)
+async function findListEntry(listId, orgId, apiKey) {
+  const client = getClient(apiKey);
+  let page = 1;
+  while (true) {
+    const res = await client.get(`/lists/${listId}/list-entries`, {
+      params: { page_size: 100, page },
+    });
+    const entries = Array.isArray(res.data) ? res.data : (res.data?.list_entries || []);
+    const found = entries.find(e => (e.entity_id ?? e.entity?.id) === orgId);
+    if (found) return found;
+    if (entries.length < 100) return null;
+    page++;
+  }
+}
+
 // ── Fields & Field Values ─────────────────────────────────────────────────────
 
 async function getListFields(listId, apiKey) {
@@ -191,6 +207,27 @@ async function setFieldValue({ fieldId, entityId, listEntryId, value }, apiKey) 
   if (listEntryId) payload.list_entry_id = listEntryId;
   const res = await client.post('/field-values', payload);
   return res.data;
+}
+
+// POST a new field value; if Affinity rejects (already exists), PATCH the existing one
+async function upsertFieldValue({ fieldId, entityId, listEntryId, value }, apiKey) {
+  try {
+    return await setFieldValue({ fieldId, entityId, listEntryId, value }, apiKey);
+  } catch (e) {
+    const status = e.response?.status;
+    if (status === 422 || status === 409) {
+      const client = getClient(apiKey);
+      const existing = await client.get('/field-values', { params: { organization_id: entityId } })
+        .then(r => Array.isArray(r.data) ? r.data : [])
+        .catch(() => []);
+      const fv = existing.find(f =>
+        f.field_id === fieldId &&
+        (!listEntryId || f.list_entry_id === listEntryId)
+      );
+      if (fv) return await updateFieldValue(fv.id, value, apiKey);
+    }
+    throw e;
+  }
 }
 
 async function updateFieldValue(fieldValueId, value, apiKey) {
@@ -218,12 +255,17 @@ async function addToSourcingList({ orgId, senderName }, apiKey) {
     return out;
   }
 
-  // 2. Add org to the list
+  // 2. Add org to the list (recover existing entry if already there)
   try {
     out.listEntry = await addOrgToList(out.list.id, orgId, apiKey);
   } catch (e) {
-    // Might already be in the list — try to continue
-    out.errors.push(`Add to list: ${e.response?.data?.message || e.message}`);
+    try {
+      out.listEntry = await findListEntry(out.list.id, orgId, apiKey);
+      if (!out.listEntry) throw new Error('entry not found after add failed');
+      console.log('[Affinity] Org already in list — using existing entry:', out.listEntry.id);
+    } catch (e2) {
+      out.errors.push(`Add to list: ${e.response?.data?.message || e.message}`);
+    }
   }
 
   if (!out.listEntry) return out;
@@ -248,7 +290,7 @@ async function addToSourcingList({ orgId, senderName }, apiKey) {
     try {
       const user = await findUserByName(senderName, apiKey);
       if (user) {
-        await setFieldValue({
+        await upsertFieldValue({
           fieldId: ownerField.id,
           entityId: orgId,
           listEntryId: out.listEntry.id,
@@ -272,7 +314,7 @@ async function addToSourcingList({ orgId, senderName }, apiKey) {
 
     if (chasingOption) {
       try {
-        const fv = await setFieldValue({
+        const fv = await upsertFieldValue({
           fieldId: priorityField.id,
           entityId: orgId,
           listEntryId: out.listEntry.id,

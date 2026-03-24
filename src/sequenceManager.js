@@ -392,7 +392,7 @@ async function runOutreachByCompany({ companyName, apiKey, affinityKey }) {
 
 // Launch full email outreach: create Apollo CRM records, build sequence with steps, enroll contact
 async function launchEmailOutreach({ companyData, ceoData, emailSequence, apiKey }) {
-  const results = { contact: null, account: null, sequence: null, enrolled: false, errors: [] };
+  const results = { contact: null, account: null, sequence: null, enrolled: false, affinity: null, errors: [] };
 
   // 1. Get email accounts (required for sending)
   let emailAccountId = null;
@@ -477,6 +477,15 @@ async function launchEmailOutreach({ companyData, ceoData, emailSequence, apiKey
       }
       const listResult = await affinity.addToSourcingList({ orgId: org.id, senderName: 'David Divver' }, affinityKey);
 
+      results.affinity = {
+        orgId: org.id,
+        addedToList: !!listResult?.listEntry,
+        listName: listResult?.list?.name || null,
+        chasingSet: !!listResult?.priorityFieldValueId,
+        ownerSet: listResult?.ownerSet || false,
+        errors: listResult?.errors || [],
+      };
+
       // Persist IDs so the Apollo reply webhook can flip status to Connected
       if (listResult?.priorityFieldValueId && listResult?.connectedOptionId && companyData?.domain) {
         tracker.saveTracking(companyData.domain, {
@@ -496,6 +505,7 @@ async function launchEmailOutreach({ companyData, ceoData, emailSequence, apiKey
     sequenceName: results.sequence?.name,
     contactId: results.contact?.id,
     enrolled: results.enrolled,
+    affinity: results.affinity,
     errors: results.errors,
   };
 }
