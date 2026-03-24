@@ -921,7 +921,7 @@ async function launchOutreach() {
     if (data.enrolled) {
       const aff = data.affinity;
       const affLine = aff?.addedToList
-        ? `Added to <b>${esc(aff.listName || 'sourcing list')}</b> · Status: <b>Chasing</b>${aff.ownerSet ? ' · Owner set' : ''}`
+        ? `Added to <b>${esc(aff.listName || 'sourcing list')}</b> · Status: <b>Chasing</b>${aff.globalOwner ? ` · Owner: <b>${esc(aff.globalOwner)}</b>` : ''}`
         : (aff ? `<span style="color:var(--yellow)">⚠ Affinity: ${esc((aff.errors || []).join(', ') || 'not added to list')}</span>` : '');
       sendStatusEl.innerHTML = `<div class="send-status send-status-ok" style="margin:0 0 14px">
         <span class="send-status-icon">✅</span>

@@ -475,7 +475,10 @@ async function launchEmailOutreach({ companyData, ceoData, emailSequence, apiKey
           organizationId: org.id,
         }, affinityKey);
       }
-      const listResult = await affinity.addToSourcingList({ orgId: org.id, senderName: 'David Divver' }, affinityKey);
+      const [listResult, globalOwnerName] = await Promise.all([
+        affinity.addToSourcingList({ orgId: org.id, senderName: 'David Divver' }, affinityKey),
+        affinity.setGlobalOwner(org.id, 'David Divver', affinityKey),
+      ]);
 
       results.affinity = {
         orgId: org.id,
@@ -483,6 +486,7 @@ async function launchEmailOutreach({ companyData, ceoData, emailSequence, apiKey
         listName: listResult?.list?.name || null,
         chasingSet: !!listResult?.priorityFieldValueId,
         ownerSet: listResult?.ownerSet || false,
+        globalOwner: globalOwnerName || null,
         errors: listResult?.errors || [],
       };
 

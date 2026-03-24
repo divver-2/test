@@ -358,7 +358,7 @@ async function setGlobalOwner(orgId, ownerName, apiKey) {
   if (!user) return false;
 
   try {
-    await setFieldValue({ fieldId: ownerField.id, entityId: orgId, listEntryId: null, value: user.id }, apiKey);
+    await upsertFieldValue({ fieldId: ownerField.id, entityId: orgId, listEntryId: null, value: user.id }, apiKey);
     return `${user.first_name || ''} ${user.last_name || ''}`.trim();
   } catch { return false; }
 }
