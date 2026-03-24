@@ -707,6 +707,11 @@ async function improveEmail() {
 function renderResult(data) {
   const { company, ceo, apollo } = data;
 
+  // Reset launch button for new result
+  const launchBtn = document.getElementById('launchBtn');
+  launchBtn.disabled = false;
+  launchBtn.textContent = 'Launch in Apollo';
+
   // Logo
   const initial = (company?.name || '?')[0].toUpperCase();
   const logoEl = document.getElementById('cLogo');
