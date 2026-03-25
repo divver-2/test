@@ -341,6 +341,7 @@ async function runOutreachByCompany({ companyName, apiKey, affinityKey }) {
     companyName: orgName,
     industry: results.organization?.industry || '',
     description: results.organization?.short_description || '',
+    website: results.organization?.website_url || (domain ? `https://${domain}` : null),
     senderName: 'David Divver',
   });
 

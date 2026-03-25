@@ -4,6 +4,25 @@ const Anthropic = require('@anthropic-ai/sdk');
 
 const FOLLOWUP_DELAY_DAYS = 42; // 6 weeks
 
+async function fetchWebsiteText(url) {
+  if (!url) return null;
+  try {
+    const { default: fetch } = await import('node-fetch');
+    const res = await fetch(url, { timeout: 5000, headers: { 'User-Agent': 'Mozilla/5.0' } });
+    const html = await res.text();
+    const text = html
+      .replace(/<script[\s\S]*?<\/script>/gi, '')
+      .replace(/<style[\s\S]*?<\/style>/gi, '')
+      .replace(/<[^>]+>/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim()
+      .slice(0, 3000);
+    return text;
+  } catch {
+    return null;
+  }
+}
+
 function getDomain(email) {
   return email.split('@')[1];
 }
@@ -40,7 +59,7 @@ function getThemeLine(industry) {
   return "I've been spending time in enterprise software and believe the next wave of B2B infrastructure is still being built";
 }
 
-async function generateInitialEmail({ ceoName, companyName, industry, description, senderName }) {
+async function generateInitialEmail({ ceoName, companyName, industry, description, website, senderName }) {
   const senderFirst = senderName ? senderName.split(' ')[0] : 'David';
   const firstName = ceoName ? ceoName.split(' ')[0] : null;
   const greeting = firstName ? `Hi ${firstName},` : 'Hi,';
@@ -50,10 +69,11 @@ async function generateInitialEmail({ ceoName, companyName, industry, descriptio
   if (apiKey) {
     try {
       const client = new Anthropic({ apiKey });
+      const websiteText = await fetchWebsiteText(website);
       const context = [
         companyName && `Company: ${companyName}`,
         industry && `Industry: ${industry}`,
-        description && `Description: ${description}`,
+        websiteText ? `Website content: ${websiteText}` : description && `Description: ${description}`,
       ].filter(Boolean).join('\n');
 
       const msg = await client.messages.create({
@@ -176,11 +196,11 @@ ${senderName || 'Your Name'}`,
   return templates[Math.min(followUpIndex, templates.length - 1)];
 }
 
-async function buildEmailSequence({ ceoName, companyName, industry, description, senderName }) {
+async function buildEmailSequence({ ceoName, companyName, industry, description, website, senderName }) {
   const emails = [];
 
   // Email 1: Initial outreach (day 0)
-  const initial = await generateInitialEmail({ ceoName, companyName, industry, description, senderName });
+  const initial = await generateInitialEmail({ ceoName, companyName, industry, description, website, senderName });
   emails.push({ ...initial, delayDays: 0, type: 'initial' });
 
   // Emails 2-6: Follow-ups every 42 days (6 weeks)

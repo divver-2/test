@@ -71,16 +71,23 @@ app.post('/api/improve-email', async (req, res) => {
       max_tokens: 400,
       messages: [{
         role: 'user',
-        content: `You are editing a short VC investor outreach email from David at NewView Capital to a founder.
+        content: `Rewrite this investor outreach email following the instruction below. Keep the exact same format — only change the investing space and the company-specific detail.
 
-Current email body:
+Current email:
 ${body}
 
 Instruction: ${instruction}
 
 ${context}
 
-Rewrite the email following the instruction. Keep it short (4-6 sentences max), keep the same greeting and "Thanks, David" sign-off. Reply with only the rewritten email body, no explanation.`,
+Required format (do not change any fixed lines):
+Line 1: greeting (e.g. "Hi Bruno,")
+Line 2: "Hope all is well, I'm an investor at NewView Capital - a $3.1bn venture growth fund."
+Line 3: "I wanted to reach out as I've been spending time in [SPACE]. I've heard positive feedback on [company], specifically around [WHAT_THEY_BUILD], and am very impressed with what you are building."
+Line 4: "I'm excited about what you are doing and wanted to see if it was a good time to connect."
+Line 5: "Thanks," then the sender name on a new line.
+
+Reply with only the rewritten email, nothing else.`,
       }],
     });
 
