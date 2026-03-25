@@ -61,19 +61,21 @@ async function generateInitialEmail({ ceoName, companyName, industry, descriptio
         max_tokens: 400,
         messages: [{
           role: 'user',
-          content: `You are writing a short VC investor outreach email on behalf of ${senderFirst} at NewView Capital ($3.1B venture growth fund) to a founder.
+          content: `Write a cold outreach email from ${senderFirst} at NewView Capital (a $3.1B venture growth fund) to the founder of ${companyName || 'this company'}.
 
-Write the complete email body following this structure:
-
-1. Greeting: "${greeting}"
-2. One sentence intro: "Hope all is well. I'm an investor at NewView Capital, a $3.1B venture growth fund."
-3. Two to three sentences that: (a) explain David's genuine investing interest in this specific space — be specific, not generic; (b) reference something concrete and compelling about what this company does or the problem they solve. Use the description to make this specific. Do NOT use "information technology" or other generic labels.
-4. One closing line: "I'm excited about what you are building and wanted to see if it was a good time to connect."
-5. Sign-off: "Thanks,\\n${senderFirst}"
-
+Context about the company:
 ${context}
 
-Keep the whole email to 5-6 sentences max. Sound like a thoughtful investor who has done their homework, not a sales template. Reply with only the email body, no explanation.`,
+Guidelines:
+- Start with "${greeting}"
+- Mention NewView Capital and that it's a $3.1B venture growth fund
+- Show you've done your homework — reference what the company specifically does using the description provided
+- Explain why you're genuinely interested as an investor — be specific to their space, not generic
+- End with a soft ask to connect
+- Sign off with "Thanks,\\n${senderFirst}"
+- 5-6 sentences max, no fluff, no buzzwords, sounds like a real person not a template
+
+Reply with only the email body, no explanation.`,
         }],
       });
 
