@@ -65,15 +65,15 @@ async function generateInitialEmail({ ceoName, companyName, industry, descriptio
 
 ${greeting}
 Hope all is well, I'm an investor at NewView Capital - a $3.1bn venture growth fund.
-I wanted to reach out as I've been spending time in [SPACE]. [COMPANY_SENTENCE]
+I wanted to reach out as I've been spending time in [SPACE]. I've heard positive feedback on ${companyName || 'your company'}, specifically around [WHAT_THEY_BUILD], and am very impressed with what you are building.
 I'm excited about what you are doing and wanted to see if it was a good time to connect.
 Thanks,
 ${senderFirst}
 
 ---
-[SPACE] — the specific niche David has been focused on that led him to this company. 3-6 words, precise and specific. E.g. "AI for elderly care", "financial compliance automation", "real-time data observability". Never use generic labels like "information technology".
+[SPACE] — 3-6 words, the specific niche that led David to this company. E.g. "AI for elderly care", "financial compliance automation", "real-time data observability". Never use generic labels like "information technology".
 
-[COMPANY_SENTENCE] — one sentence about what you've heard about this company. Start with "I've heard a lot of positive feedback on ${companyName || 'the company'}, specifically around..." or "I think there's a lot of opportunity here and have heard positive feedback on ${companyName || 'the company'}, particularly around...". Reference something specific about what they build. End with "and am very impressed with what you are building." — max 30 words.
+[WHAT_THEY_BUILD] — 4-8 words describing what the company specifically builds or does. E.g. "automating complex healthcare workflows", "real-time log and metrics observability", "AI-powered revenue cycle automation". Use the description to be precise.
 
 ${context}`,
         }],
