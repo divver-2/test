@@ -280,9 +280,10 @@ async function addToSourcingList({ orgId, senderName }, apiKey) {
   }
 
   const ownerField = fields.find(f => f.name?.toLowerCase().includes('owner'));
+
+  // Find whichever dropdown field has a "Chasing" option — don't assume the field name
   const priorityField = fields.find(f =>
-    f.name?.toLowerCase().includes('priority') ||
-    f.name?.toLowerCase().includes('status')
+    f.dropdown_options?.some(o => o.text?.toLowerCase().includes('chasing'))
   );
 
   console.log('[Affinity] list fields:', fields.map(f => f.name));
