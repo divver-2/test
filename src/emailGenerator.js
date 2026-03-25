@@ -58,24 +58,27 @@ async function generateInitialEmail({ ceoName, companyName, industry, descriptio
 
       const msg = await client.messages.create({
         model: 'claude-sonnet-4-6',
-        max_tokens: 500,
+        max_tokens: 400,
         messages: [{
           role: 'user',
-          content: `Write a cold investor outreach email from ${senderFirst} at NewView Capital to the founder of ${companyName || 'this company'}.
+          content: `Write a 4-sentence cold investor outreach email from ${senderFirst} at NewView Capital to the founder of ${companyName || 'this company'}.
 
-Use exactly this style and format — no greeting, no sign-off, just the body paragraphs:
+Follow this exact structure — one sentence per point, no more:
 
-"I'm ${senderFirst} from NewView Capital, a $3.1B venture growth fund that backs category-defining companies at the growth stage. I've been following [COMPANY] closely and what stands out to me is [SPECIFIC ARCHITECTURAL OR PRODUCT INSIGHT — something concrete and technical that shows you've done real research, not marketing copy]. [ONE SENTENCE on why this positions them well in the market — mention specific trends, customer pain points, or competitive dynamics]. We've been actively investing in [SPECIFIC SPACE] and believe there's a significant opportunity for [COMPANY] to [SPECIFIC OUTCOME]. Would you be open to a brief call to get to know each other?"
+1. "I'm ${senderFirst} from NewView Capital, a $3.1B venture growth fund that backs category-defining companies at the growth stage."
+2. "I've been following ${companyName} closely and what stands out to me is [ONE specific product or architectural insight — something concrete that shows real research, e.g. a technical decision, business model choice, or market positioning, not generic praise]."
+3. "[One sentence on why this positions them well right now — name a specific market dynamic, customer pain point, or competitive shift. Be direct and sharp.]"
+4. "We've been actively investing in [specific space] and believe there's a significant opportunity for ${companyName} to [specific outcome]. Would you be open to a brief call to get to know each other?"
 
 Rules:
-- Sound like a smart investor who has done their homework, not a sales rep
-- Reference specific product decisions, architecture, or market positioning — not generic praise
-- Keep it to 4-5 sentences total
-- No fluff, no buzzwords, no "I'm excited about what you're building"
+- Sentences 2 and 3 must be specific to this company — no generic statements
+- Sound like a smart investor, not a salesperson
+- No fluff, no "excited about what you're building"
+- Total email: 4 sentences only
 
 ${context}
 
-Reply with only the email body, no explanation.`,
+Reply with only the email, no explanation.`,
         }],
       });
 
