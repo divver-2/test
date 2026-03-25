@@ -105,7 +105,7 @@ ${context}`,
 
       return {
         subject: `Connecting from NewView Capital`,
-        body: msg.content[0].text.trim(),
+        body: msg.content[0].text.trim().replace(/\[([^\]]+)\]/g, '$1'),
       };
     } catch (e) {
       console.error('[Claude] email generation failed:', e.message);

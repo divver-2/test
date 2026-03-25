@@ -94,7 +94,7 @@ Reply with only the rewritten email, nothing else.`,
       }],
     });
 
-    res.json({ subject: subject || 'Connecting from NewView Capital', body: msg.content[0].text.trim() });
+    res.json({ subject: subject || 'Connecting from NewView Capital', body: msg.content[0].text.trim().replace(/\[([^\]]+)\]/g, '$1') });
   } catch (err) {
     console.error('[/api/improve-email] Error:', err.message);
     res.status(500).json({ error: err.message });
