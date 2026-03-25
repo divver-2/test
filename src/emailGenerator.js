@@ -58,33 +58,22 @@ async function generateInitialEmail({ ceoName, companyName, industry, descriptio
 
       const msg = await client.messages.create({
         model: 'claude-sonnet-4-6',
-        max_tokens: 300,
+        max_tokens: 400,
         messages: [{
           role: 'user',
-          content: `You are writing a short VC investor outreach email on behalf of David at NewView Capital ($3.1B venture growth fund) to a founder.
+          content: `You are writing a short VC investor outreach email on behalf of ${senderFirst} at NewView Capital ($3.1B venture growth fund) to a founder.
 
-Write the complete email body in exactly this format — do not change the fixed lines, only fill in the two bracketed parts:
+Write the complete email body following this structure:
 
----
-${greeting}
-
-Hope all is well. I'm an investor at NewView Capital, a $3.1B venture growth fund.
-
-I wanted to reach out as [THEME]. ${companyName || 'Your company'} is a great example of that and I've heard strong feedback on [PRODUCT].
-
-I'm excited about what you are building and wanted to see if it was a good time to connect.
-
-Thanks,
-${senderFirst}
----
-
-[THEME] — one sentence on David's investing angle that naturally leads to this company. Specific and genuine, like "I've been spending time in voice AI and believe it will become a key point of data capture" or "I find the opportunity to bring AI to essential service industries particularly compelling". Never use generic labels like "information technology". Max 25 words.
-
-[PRODUCT] — a concise, specific reference to what this company actually does or the problem it uniquely solves. Use the description if provided. Be concrete — name the specific product, capability, or market insight. Max 20 words. Do not say "what you are building" generically.
+1. Greeting: "${greeting}"
+2. One sentence intro: "Hope all is well. I'm an investor at NewView Capital, a $3.1B venture growth fund."
+3. Two to three sentences that: (a) explain David's genuine investing interest in this specific space — be specific, not generic; (b) reference something concrete and compelling about what this company does or the problem they solve. Use the description to make this specific. Do NOT use "information technology" or other generic labels.
+4. One closing line: "I'm excited about what you are building and wanted to see if it was a good time to connect."
+5. Sign-off: "Thanks,\\n${senderFirst}"
 
 ${context}
 
-Reply with only the completed email, no explanation.`,
+Keep the whole email to 5-6 sentences max. Sound like a thoughtful investor who has done their homework, not a sales template. Reply with only the email body, no explanation.`,
         }],
       });
 
@@ -99,8 +88,15 @@ Reply with only the completed email, no explanation.`,
 
   // Fallback if no API key or Claude fails
   const themeLine = getThemeLine(industry);
-  const productLine = description
-    ? `${companyName || 'Your company'} is a great example of that and I've heard strong feedback on ${description.split('.')[0].toLowerCase().trim()}.`
+  // Extract core capability from description (strip company name, location, founding info)
+  let productDescriptor = null;
+  if (description) {
+    const first = description.split('.')[0];
+    const match = first.match(/\bis\s+(?:an?\s+)?([^,]+?)(?:\s+(?:company\s+)?(?:based|founded|located|headquartered)|,|$)/i);
+    productDescriptor = match ? match[1].trim() : null;
+  }
+  const productLine = productDescriptor
+    ? `${companyName || 'Your company'} is a great example of that and I've heard strong feedback on their ${productDescriptor}.`
     : `${companyName || 'Your company'} is a great example of that and I've heard strong things about the team.`;
   return {
     subject: `Connecting from NewView Capital`,
