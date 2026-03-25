@@ -58,28 +58,24 @@ async function generateInitialEmail({ ceoName, companyName, industry, descriptio
 
       const msg = await client.messages.create({
         model: 'claude-sonnet-4-6',
-        max_tokens: 400,
+        max_tokens: 300,
         messages: [{
           role: 'user',
-          content: `Write a 4-sentence cold investor outreach email from ${senderFirst} at NewView Capital to the founder of ${companyName || 'this company'}.
+          content: `Fill in the blanks in this email and reply with only the completed email, nothing else.
 
-Follow this exact structure — one sentence per point, no more:
+${greeting}
+Hope all is well, I'm an investor at NewView Capital - a $3.1bn venture growth fund.
+I wanted to reach out as I've been spending time in [SPACE]. [COMPANY_SENTENCE]
+I'm excited about what you are doing and wanted to see if it was a good time to connect.
+Thanks,
+${senderFirst}
 
-1. "I'm ${senderFirst} from NewView Capital, a $3.1B venture growth fund that backs category-defining companies at the growth stage."
-2. "I've been following ${companyName} closely and what stands out to me is [ONE specific product or architectural insight — something concrete that shows real research, e.g. a technical decision, business model choice, or market positioning, not generic praise]."
-3. "[One sentence on why this positions them well right now — name a specific market dynamic, customer pain point, or competitive shift. Be direct and sharp.]"
-4. "We've been actively investing in [specific space] and believe there's a significant opportunity for ${companyName} to [specific outcome]. Would you be open to a brief call to get to know each other?"
+---
+[SPACE] — the specific niche David has been focused on that led him to this company. 3-6 words, precise and specific. E.g. "AI for elderly care", "financial compliance automation", "real-time data observability". Never use generic labels like "information technology".
 
-Rules:
-- Sentences 2 and 3 must be specific to this company — no generic statements
-- Sound like a smart investor, not a salesperson
-- No subject line, no greeting, no sign-off — just the 4 sentences
-- No fluff, no "excited about what you're building"
-- Total email: 4 sentences only
+[COMPANY_SENTENCE] — one sentence about what you've heard about this company. Start with "I've heard a lot of positive feedback on ${companyName || 'the company'}, specifically around..." or "I think there's a lot of opportunity here and have heard positive feedback on ${companyName || 'the company'}, particularly around...". Reference something specific about what they build. End with "and am very impressed with what you are building." — max 30 words.
 
-${context}
-
-Reply with only the 4 sentences, nothing else.`,
+${context}`,
         }],
       });
 
