@@ -73,12 +73,13 @@ Follow this exact structure — one sentence per point, no more:
 Rules:
 - Sentences 2 and 3 must be specific to this company — no generic statements
 - Sound like a smart investor, not a salesperson
+- No subject line, no greeting, no sign-off — just the 4 sentences
 - No fluff, no "excited about what you're building"
 - Total email: 4 sentences only
 
 ${context}
 
-Reply with only the email, no explanation.`,
+Reply with only the 4 sentences, nothing else.`,
         }],
       });
 
