@@ -58,24 +58,24 @@ async function generateInitialEmail({ ceoName, companyName, industry, descriptio
 
       const msg = await client.messages.create({
         model: 'claude-sonnet-4-6',
-        max_tokens: 400,
+        max_tokens: 300,
         messages: [{
           role: 'user',
-          content: `Write a cold outreach email from ${senderFirst} at NewView Capital (a $3.1B venture growth fund) to the founder of ${companyName || 'this company'}.
+          content: `Fill in the two blanks in this email. Reply with only the completed email, no explanation.
 
-Context about the company:
-${context}
+${greeting}
+Hope all is well, I'm an investor at NewView Capital - a $3.1bn venture growth fund.
+I wanted to reach out as I've been spending time in [THEME]. I've heard positive feedback on ${companyName || 'your company'}, particularly around [SPECIFIC], and am very impressed with what you are building.
+I'm excited about what you are doing and wanted to see if it was a good time to connect.
+Thanks,
+${senderFirst}
 
-Guidelines:
-- Start with "${greeting}"
-- Mention NewView Capital and that it's a $3.1B venture growth fund
-- Show you've done your homework — reference what the company specifically does using the description provided
-- Explain why you're genuinely interested as an investor — be specific to their space, not generic
-- End with a soft ask to connect
-- Sign off with "Thanks,\\n${senderFirst}"
-- 5-6 sentences max, no fluff, no buzzwords, sounds like a real person not a template
+---
+[THEME] — the specific niche or trend that led David to this company. Be precise, e.g. "AI-driven healthcare automation" or "real-time data observability for cloud infrastructure". Never say "information technology" or anything generic. Max 8 words.
 
-Reply with only the email body, no explanation.`,
+[SPECIFIC] — one concrete thing the company is known for or does well, based on the description. e.g. "automating complex healthcare workflows" or "reducing cloud monitoring costs at scale". Max 10 words.
+
+${context}`,
         }],
       });
 
@@ -97,19 +97,13 @@ Reply with only the email body, no explanation.`,
     const match = first.match(/\bis\s+(?:an?\s+)?([^,]+?)(?:\s+(?:company\s+)?(?:based|founded|located|headquartered)|,|$)/i);
     productDescriptor = match ? match[1].trim() : null;
   }
-  const productLine = productDescriptor
-    ? `${companyName || 'Your company'} is a great example of that and I've heard strong feedback on their ${productDescriptor}.`
-    : `${companyName || 'Your company'} is a great example of that and I've heard strong things about the team.`;
+  const specificThing = productDescriptor || 'what you are building';
   return {
     subject: `Connecting from NewView Capital`,
     body: `${greeting}
-
-Hope all is well. I'm an investor at NewView Capital, a $3.1B venture growth fund.
-
-I wanted to reach out as ${themeLine}. ${productLine}
-
-I'm excited about what you are building and wanted to see if it was a good time to connect.
-
+Hope all is well, I'm an investor at NewView Capital - a $3.1bn venture growth fund.
+I wanted to reach out as ${themeLine}. I've heard positive feedback on ${companyName || 'your company'}, particularly around ${specificThing}, and am very impressed with what you are building.
+I'm excited about what you are doing and wanted to see if it was a good time to connect.
 Thanks,
 ${senderFirst}`,
   };
