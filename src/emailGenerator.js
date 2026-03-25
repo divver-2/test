@@ -85,8 +85,11 @@ async function generateInitialEmail({ ceoName, companyName, industry, descriptio
 
 ${greeting}
 Hope all is well, I'm an investor at NewView Capital - a $3.1bn venture growth fund.
+
 I wanted to reach out as I've been spending time in [SPACE]. I've heard positive feedback on ${companyName || 'your company'}, specifically around [WHAT_THEY_BUILD], and am very impressed with what you are building.
+
 I'm excited about what you are doing and wanted to see if it was a good time to connect.
+
 Thanks,
 ${senderFirst}
 
@@ -122,8 +125,11 @@ ${context}`,
     subject: `Connecting from NewView Capital`,
     body: `${greeting}
 Hope all is well, I'm an investor at NewView Capital - a $3.1bn venture growth fund.
+
 I wanted to reach out as ${themeLine}. I've heard positive feedback on ${companyName || 'your company'}, particularly around ${specificThing}, and am very impressed with what you are building.
+
 I'm excited about what you are doing and wanted to see if it was a good time to connect.
+
 Thanks,
 ${senderFirst}`,
   };

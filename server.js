@@ -83,8 +83,11 @@ ${context}
 Required format (do not change any fixed lines):
 Line 1: greeting (e.g. "Hi Bruno,")
 Line 2: "Hope all is well, I'm an investor at NewView Capital - a $3.1bn venture growth fund."
+[blank line]
 Line 3: "I wanted to reach out as I've been spending time in [SPACE]. I've heard positive feedback on [company], specifically around [WHAT_THEY_BUILD], and am very impressed with what you are building."
+[blank line]
 Line 4: "I'm excited about what you are doing and wanted to see if it was a good time to connect."
+[blank line]
 Line 5: "Thanks," then the sender name on a new line.
 
 Reply with only the rewritten email, nothing else.`,
