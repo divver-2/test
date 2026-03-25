@@ -58,24 +58,24 @@ async function generateInitialEmail({ ceoName, companyName, industry, descriptio
 
       const msg = await client.messages.create({
         model: 'claude-sonnet-4-6',
-        max_tokens: 300,
+        max_tokens: 500,
         messages: [{
           role: 'user',
-          content: `Fill in the two blanks in this email. Reply with only the completed email, no explanation.
+          content: `Write a cold investor outreach email from ${senderFirst} at NewView Capital to the founder of ${companyName || 'this company'}.
 
-${greeting}
-Hope all is well, I'm an investor at NewView Capital - a $3.1bn venture growth fund.
-I wanted to reach out as I've been spending time in [THEME]. I've heard positive feedback on ${companyName || 'your company'}, particularly around [SPECIFIC], and am very impressed with what you are building.
-I'm excited about what you are doing and wanted to see if it was a good time to connect.
-Thanks,
-${senderFirst}
+Use exactly this style and format — no greeting, no sign-off, just the body paragraphs:
 
----
-[THEME] — the specific niche or trend that led David to this company. Be precise, e.g. "AI-driven healthcare automation" or "real-time data observability for cloud infrastructure". Never say "information technology" or anything generic. Max 8 words.
+"I'm ${senderFirst} from NewView Capital, a $3.1B venture growth fund that backs category-defining companies at the growth stage. I've been following [COMPANY] closely and what stands out to me is [SPECIFIC ARCHITECTURAL OR PRODUCT INSIGHT — something concrete and technical that shows you've done real research, not marketing copy]. [ONE SENTENCE on why this positions them well in the market — mention specific trends, customer pain points, or competitive dynamics]. We've been actively investing in [SPECIFIC SPACE] and believe there's a significant opportunity for [COMPANY] to [SPECIFIC OUTCOME]. Would you be open to a brief call to get to know each other?"
 
-[SPECIFIC] — one concrete thing the company is known for or does well, based on the description. e.g. "automating complex healthcare workflows" or "reducing cloud monitoring costs at scale". Max 10 words.
+Rules:
+- Sound like a smart investor who has done their homework, not a sales rep
+- Reference specific product decisions, architecture, or market positioning — not generic praise
+- Keep it to 4-5 sentences total
+- No fluff, no buzzwords, no "I'm excited about what you're building"
 
-${context}`,
+${context}
+
+Reply with only the email body, no explanation.`,
         }],
       });
 
