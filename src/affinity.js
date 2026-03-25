@@ -285,6 +285,9 @@ async function addToSourcingList({ orgId, senderName }, apiKey) {
     f.name?.toLowerCase().includes('status')
   );
 
+  console.log('[Affinity] list fields:', fields.map(f => f.name));
+  console.log('[Affinity] priorityField:', priorityField?.name, '| options:', priorityField?.dropdown_options?.map(o => o.text));
+
   // 4. Set global owner from senderName
   if (ownerField && senderName) {
     try {
