@@ -69,7 +69,7 @@ ${senderFirst}
 
 [THEME] — one sentence on David's investing angle that naturally leads to this company. Specific and genuine, like "I've been spending time in voice AI and believe it will become a key point of data capture" or "I find the opportunity to bring AI to essential service industries particularly compelling". Never use generic labels like "information technology". Max 25 words.
 
-[PRODUCT] — one specific sentence about what makes this company's product valuable or the problem they uniquely solve. Concrete, not a company overview. Max 20 words.
+[PRODUCT] — a concise, specific reference to what this company actually does or the problem it uniquely solves. Use the description if provided. Be concrete — name the specific product, capability, or market insight. Max 20 words. Do not say "what you are building" generically.
 
 ${context}
 
