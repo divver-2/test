@@ -84,6 +84,7 @@ async function generateInitialEmail({ ceoName, companyName, industry, descriptio
           content: `Fill in the blanks in this email and reply with only the completed email, nothing else.
 
 ${greeting}
+
 Hope all is well, I'm an investor at NewView Capital - a $3.1bn venture growth fund.
 
 I wanted to reach out as I've been spending time in [SPACE]. I've heard positive feedback on ${companyName || 'your company'}, specifically around [WHAT_THEY_BUILD], and am very impressed with what you are building.
@@ -124,6 +125,7 @@ ${context}`,
   return {
     subject: `Connecting from NewView Capital`,
     body: `${greeting}
+
 Hope all is well, I'm an investor at NewView Capital - a $3.1bn venture growth fund.
 
 I wanted to reach out as ${themeLine}. I've heard positive feedback on ${companyName || 'your company'}, particularly around ${specificThing}, and am very impressed with what you are building.
