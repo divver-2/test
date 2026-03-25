@@ -462,12 +462,15 @@ async function launchEmailOutreach({ companyData, ceoData, emailSequence, apiKey
 
   // 6. Sync to Affinity
   const affinityKey = process.env.AFFINITY_API_KEY;
-  if (affinityKey && companyData?.name) {
+  console.log('[Affinity] launchEmailOutreach — affinityKey set:', !!affinityKey, '| companyData.name:', companyData?.name, '| companyData.domain:', companyData?.domain);
+  if (affinityKey && (companyData?.name || companyData?.domain)) {
     try {
-      const { org } = await affinity.upsertOrganization(
-        { name: companyData.name, domain: companyData.domain },
+      const orgName = companyData.name || companyData.domain;
+      const { org, created } = await affinity.upsertOrganization(
+        { name: orgName, domain: companyData.domain },
         affinityKey
       );
+      console.log('[Affinity] org upserted:', org.id, org.name, '| created:', created);
       if (ceoData?.firstName) {
         await affinity.upsertPerson({
           firstName: ceoData.firstName,
@@ -480,6 +483,7 @@ async function launchEmailOutreach({ companyData, ceoData, emailSequence, apiKey
         affinity.addToSourcingList({ orgId: org.id, senderName: 'David Divver' }, affinityKey),
         affinity.setGlobalOwner(org.id, 'David Divver', affinityKey),
       ]);
+      console.log('[Affinity] addedToList:', !!listResult?.listEntry, '| chasingSet:', !!listResult?.priorityFieldValueId, '| errors:', listResult?.errors);
 
       results.affinity = {
         orgId: org.id,
@@ -500,6 +504,7 @@ async function launchEmailOutreach({ companyData, ceoData, emailSequence, apiKey
         });
       }
     } catch (e) {
+      console.error('[Affinity] sync error:', e.response?.status, e.response?.data || e.message);
       results.errors.push(`Affinity sync: ${e.message}`);
     }
   }
