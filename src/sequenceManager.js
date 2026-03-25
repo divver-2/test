@@ -392,7 +392,7 @@ async function runOutreachByCompany({ companyName, apiKey, affinityKey }) {
 }
 
 // Launch full email outreach: create Apollo CRM records, build sequence with steps, enroll contact
-async function launchEmailOutreach({ companyData, ceoData, emailSequence, apiKey }) {
+async function launchEmailOutreach({ companyData, ceoData, emailSequence, apiKey, affinityKey: passedAffinityKey }) {
   const results = { contact: null, account: null, sequence: null, enrolled: false, affinity: null, errors: [] };
 
   // 1. Get email accounts (required for sending)
@@ -461,7 +461,7 @@ async function launchEmailOutreach({ companyData, ceoData, emailSequence, apiKey
   }
 
   // 6. Sync to Affinity
-  const affinityKey = process.env.AFFINITY_API_KEY;
+  const affinityKey = passedAffinityKey || process.env.AFFINITY_API_KEY;
   console.log('[Affinity] launchEmailOutreach — affinityKey set:', !!affinityKey, '| companyData.name:', companyData?.name, '| companyData.domain:', companyData?.domain);
   if (affinityKey && (companyData?.name || companyData?.domain)) {
     try {

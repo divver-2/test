@@ -912,6 +912,7 @@ async function launchOutreach() {
         ceoData: currentResult.ceo,
         emailSequence: currentResult.emailSequence,
         apiKey,
+        affinityKey: getAffinityKey(),
       }),
     });
     const data = await res.json();

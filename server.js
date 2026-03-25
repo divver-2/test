@@ -35,14 +35,16 @@ app.post('/api/company', async (req, res) => {
 
 // Send outreach — create Apollo CRM records, build sequence with email steps, enroll contact
 app.post('/api/send-outreach', async (req, res) => {
-  const { companyData, ceoData, emailSequence, apiKey: bodyKey } = req.body;
+  const { companyData, ceoData, emailSequence, apiKey: bodyKey, affinityKey: bodyAffinityKey } = req.body;
   if (!ceoData?.email) return res.status(400).json({ error: 'ceoData.email is required' });
 
   const apiKey = bodyKey || process.env.APOLLO_API_KEY;
   if (!apiKey) return res.status(400).json({ error: 'Apollo API key is required' });
 
+  const affinityKey = bodyAffinityKey || process.env.AFFINITY_API_KEY;
+
   try {
-    const result = await launchEmailOutreach({ companyData, ceoData, emailSequence, apiKey });
+    const result = await launchEmailOutreach({ companyData, ceoData, emailSequence, apiKey, affinityKey });
     res.json(result);
   } catch (err) {
     console.error('[/api/send-outreach] Error:', err.message);
