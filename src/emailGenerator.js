@@ -14,19 +14,30 @@ function capitalize(str) {
 }
 
 function getThemeLine(industry) {
-  const themes = {
-    'Technology': "I've been spending time in enterprise software and believe the next wave of infrastructure is still being built",
-    'SaaS': "I've been spending time in SaaS and find the opportunity to drive operational leverage through software particularly compelling",
-    'Financial Services': "I've been spending time in fintech and believe there is a significant opportunity to modernise how financial services are delivered",
-    'Healthcare': "I've been spending time in healthtech and find the opportunity to bring technology to essential healthcare services particularly compelling",
-    'E-Commerce': "I've been spending time in e-commerce and believe the infrastructure layer powering modern commerce is still maturing",
-    'Marketing': "I've been spending time in marketing technology and believe AI will fundamentally change how brands acquire and retain customers",
-    'Artificial Intelligence': "I've been spending time in AI and believe it will become a key point of data capture and competitive differentiation going forward",
-    'Data Analytics': "I've been spending time in data and analytics and believe companies that turn data into action will define the next era of software",
-    'Cybersecurity': "I've been spending time in cybersecurity and find the opportunity to bring modern, AI-native security to enterprises particularly compelling",
-    'Developer Tools': "I've been spending time in developer tools and believe the way software is built is undergoing a fundamental shift",
-  };
-  return themes[industry] || `I've been spending time in ${industry ? industry.toLowerCase() : 'this space'} and find the opportunity here particularly compelling`;
+  const normalized = (industry || '').toLowerCase().trim();
+  const themes = [
+    [['saas', 'software as a service'], "I've been spending time in SaaS and find the opportunity to drive operational leverage through software particularly compelling"],
+    [['artificial intelligence', 'machine learning', 'ai'], "I've been spending time in AI and believe it will become a key point of data capture and competitive differentiation going forward"],
+    [['fintech', 'financial services', 'financial technology', 'banking'], "I've been spending time in fintech and believe there is a significant opportunity to modernise how financial services are delivered"],
+    [['healthcare', 'health tech', 'healthtech', 'medtech', 'medical'], "I've been spending time in healthtech and find the opportunity to bring technology to essential healthcare services particularly compelling"],
+    [['e-commerce', 'ecommerce', 'retail', 'consumer'], "I've been spending time in e-commerce and believe the infrastructure layer powering modern commerce is still maturing"],
+    [['marketing', 'adtech', 'advertising'], "I've been spending time in marketing technology and believe AI will fundamentally change how brands acquire and retain customers"],
+    [['data', 'analytics', 'data analytics', 'business intelligence'], "I've been spending time in data and analytics and believe companies that turn data into action will define the next era of software"],
+    [['cybersecurity', 'security', 'infosec'], "I've been spending time in cybersecurity and find the opportunity to bring modern, AI-native security to enterprises particularly compelling"],
+    [['developer tools', 'devtools', 'developer platform', 'infrastructure'], "I've been spending time in developer tools and believe the way software is built is undergoing a fundamental shift"],
+    [['logistics', 'supply chain', 'transportation'], "I've been spending time in logistics technology and believe the opportunity to bring intelligence to physical supply chains is still largely untapped"],
+    [['climate', 'cleantech', 'energy', 'sustainability'], "I've been spending time in climate tech and believe the next decade will produce some of the most important infrastructure companies we've ever seen"],
+    [['real estate', 'proptech', 'construction'], "I've been spending time in proptech and believe real estate is one of the last industries to be meaningfully transformed by software"],
+    [['hrtech', 'hr tech', 'human resources', 'future of work', 'workforce'], "I've been spending time in workforce technology and believe the way companies hire, manage and retain talent is being fundamentally redesigned"],
+    [['edtech', 'education', 'e-learning'], "I've been spending time in edtech and believe the opportunity to personalise learning at scale is still in its early innings"],
+    [['information technology', 'information technology & services', 'it services', 'enterprise software', 'technology'], "I've been spending time in enterprise software and believe the next wave of B2B infrastructure is still being built"],
+  ];
+
+  for (const [keywords, line] of themes) {
+    if (keywords.some(k => normalized.includes(k))) return line;
+  }
+
+  return "I've been spending time in enterprise software and believe the next wave of B2B infrastructure is still being built";
 }
 
 async function generateInitialEmail({ ceoName, companyName, industry, description, senderName }) {
@@ -88,13 +99,16 @@ Reply with only the completed email, no explanation.`,
 
   // Fallback if no API key or Claude fails
   const themeLine = getThemeLine(industry);
+  const productLine = description
+    ? `${companyName || 'Your company'} is a great example of that and I've heard strong feedback on ${description.split('.')[0].toLowerCase().trim()}.`
+    : `${companyName || 'Your company'} is a great example of that and I've heard strong things about the team.`;
   return {
     subject: `Connecting from NewView Capital`,
     body: `${greeting}
 
 Hope all is well. I'm an investor at NewView Capital, a $3.1B venture growth fund.
 
-I wanted to reach out as ${themeLine}. ${companyName || 'Your company'} is a great example of that and I've heard strong feedback on what you are building.
+I wanted to reach out as ${themeLine}. ${productLine}
 
 I'm excited about what you are building and wanted to see if it was a good time to connect.
 
