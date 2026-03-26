@@ -87,7 +87,7 @@ ${greeting}
 
 Hope all is well, I'm an investor at NewView Capital - a $3.1bn venture growth fund.
 
-I wanted to reach out as I've been spending time in [SPACE]. I've heard positive feedback on ${companyName || 'your company'}, specifically around [WHAT_THEY_BUILD], and am very impressed with what you are building.
+I wanted to reach out as I've been spending time in [INDUSTRY_SEGMENT]. I've heard positive feedback on ${companyName || 'your company'}, specifically [SPECIFIC_OBSERVATION], and am very impressed with what you are building.
 
 I'm excited about what you are doing and wanted to see if it was a good time to connect.
 
@@ -95,9 +95,9 @@ Thanks,
 ${senderFirst}
 
 ---
-[SPACE] — 3-6 words, the specific niche that led David to this company. E.g. "AI for elderly care", "financial compliance automation", "real-time data observability". Never use generic labels like "information technology".
+[INDUSTRY_SEGMENT] — 3-6 words, the specific industry segment or niche that led David to this company. E.g. "AI for elderly care", "financial compliance automation", "real-time data observability". Never use generic labels like "information technology" or "enterprise software".
 
-[WHAT_THEY_BUILD] — 4-8 words describing what the company specifically builds or does. E.g. "automating complex healthcare workflows", "real-time log and metrics observability", "AI-powered revenue cycle automation". Use the description to be precise.
+[SPECIFIC_OBSERVATION] — a sharp, specific observation about what makes this company interesting or differentiated. 6-12 words. E.g. "how you've simplified compliance workflows for mid-market banks", "your approach to reducing alert fatigue in observability". Grounded in what you read on their website — not generic praise.
 
 ${context}`,
         }],
