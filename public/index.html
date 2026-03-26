@@ -468,7 +468,7 @@
       <div class="draft-actions">
         <button class="btn-copy" onclick="copyEmail()">Copy Email</button>
         <a class="btn-mailto" id="mailtoLink" href="#">Open in Email App</a>
-        <button class="btn btn-primary" id="launchBtn" onclick="launchOutreach()" style="padding:8px 18px;font-size:0.85rem">Launch in Apollo</button>
+        <button class="btn btn-primary" id="launchBtn" onclick="launchOutreach()" style="padding:8px 18px;font-size:0.85rem">Sequence Launch</button>
       </div>
     </div>
   </div>
@@ -719,7 +719,7 @@ function renderResult(data) {
   // Reset launch button for new result
   const launchBtn = document.getElementById('launchBtn');
   launchBtn.disabled = false;
-  launchBtn.textContent = 'Launch in Apollo';
+  launchBtn.textContent = 'Sequence Launch';
 
   // Logo
   const initial = (company?.name || '?')[0].toUpperCase();
@@ -960,7 +960,7 @@ async function launchOutreach() {
   } catch(e) {
     setStatus('Launch error: ' + e.message, 'error');
     btn.disabled = false;
-    btn.textContent = 'Launch in Apollo';
+    btn.textContent = 'Sequence Launch';
   }
 }
 

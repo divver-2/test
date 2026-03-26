@@ -130,8 +130,16 @@ async function resolveOwnerValue(raw, apiKey, cachedUsers) {
 // Find user whose name matches (fuzzy)
 async function findUserByName(name, apiKey) {
   if (!name) return null;
-  const users = await getUsers(apiKey);
   const needle = name.toLowerCase().trim();
+
+  // Check KNOWN_USERS by name first (works even if /auth/whoami doesn't return all team members)
+  const knownEntry = Object.entries(KNOWN_USERS).find(([, n]) => {
+    const full = n.toLowerCase();
+    return full === needle || full.startsWith(needle) || needle.startsWith(full);
+  });
+  if (knownEntry) return { id: Number(knownEntry[0]), name: knownEntry[1] };
+
+  const users = await getUsers(apiKey);
   return (
     users.find(u => {
       const full = userName(u)?.toLowerCase() || '';
