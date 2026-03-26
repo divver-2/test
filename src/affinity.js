@@ -408,21 +408,27 @@ async function markConnected({ priorityFieldValueId, priorityContext, connectedO
 
 async function setGlobalOwner(orgId, ownerName, apiKey) {
   const globalFields = await getGlobalFields(apiKey);
+  console.log('[Affinity] setGlobalOwner — globalFields:', globalFields.map(f => `${f.name}(${f.id},type=${f.value_type})`));
 
-  const ownerField = globalFields.find(f =>
-    f.name?.toLowerCase() === 'owner' ||
-    f.name?.toLowerCase().includes('global owner') ||
-    f.name?.toLowerCase().includes('owner')
-  );
+  const ownerField =
+    globalFields.find(f => f.name?.toLowerCase() === 'global owner') ||
+    globalFields.find(f => f.name?.toLowerCase() === 'owner') ||
+    globalFields.find(f => f.name?.toLowerCase().includes('owner'));
+  console.log('[Affinity] setGlobalOwner — ownerField:', ownerField ? `${ownerField.name}(${ownerField.id})` : 'NOT FOUND');
   if (!ownerField) return false;
 
   const user = await findUserByName(ownerName, apiKey);
+  console.log('[Affinity] setGlobalOwner — user resolved:', user ? `${user.name || user.id}(id=${user.id})` : 'NOT FOUND');
   if (!user) return false;
 
   try {
     await upsertFieldValue({ fieldId: ownerField.id, entityId: orgId, listEntryId: null, value: user.id }, apiKey);
-    return `${user.first_name || ''} ${user.last_name || ''}`.trim();
-  } catch { return false; }
+    console.log('[Affinity] setGlobalOwner — success');
+    return `${user.first_name || user.name || ''} ${user.last_name || ''}`.trim();
+  } catch (e) {
+    console.error('[Affinity] setGlobalOwner error:', e.response?.status, JSON.stringify(e.response?.data));
+    return false;
+  }
 }
 
 // ── Lookup company: owner + email history (read-only) ─────────────────────────
