@@ -242,6 +242,7 @@ async function syncRepliesFromApollo() {
       try {
         await affinity.markConnected({
           priorityFieldValueId: tracked.priorityFieldValueId,
+          priorityContext: tracked.priorityContext || null,
           connectedOptionId: tracked.connectedOptionId,
         }, affinityKey);
         console.log(`[poll-replies] Marked Connected in Affinity: ${reply.domain}`);
@@ -319,6 +320,7 @@ app.post('/api/webhooks/apollo', async (req, res) => {
 
     await affinity.markConnected({
       priorityFieldValueId: tracked.priorityFieldValueId,
+      priorityContext: tracked.priorityContext || null,
       connectedOptionId: tracked.connectedOptionId,
     }, affinityKey);
 

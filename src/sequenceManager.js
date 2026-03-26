@@ -129,6 +129,7 @@ async function runOutreachSequence({ email, senderName, apiKey }) {
           priorityFieldValueId: results.affinityList.priorityFieldValueId,
           connectedOptionId: results.affinityList.connectedOptionId,
           orgId: org.id,
+          priorityContext: results.affinityList.priorityContext || null,
         });
       }
     } catch (e) {
@@ -501,6 +502,7 @@ async function launchEmailOutreach({ companyData, ceoData, emailSequence, apiKey
           priorityFieldValueId: listResult.priorityFieldValueId,
           connectedOptionId: listResult.connectedOptionId,
           orgId: org.id,
+          priorityContext: listResult.priorityContext || null,
         });
       }
     } catch (e) {

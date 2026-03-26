@@ -229,7 +229,7 @@ async function setFieldValue({ fieldId, entityId, listEntryId, value }, apiKey) 
   throw lastErr;
 }
 
-// POST a new field value; if Affinity rejects (already exists), PATCH the existing one
+// POST a new field value; if Affinity rejects (already exists), DELETE + POST
 async function upsertFieldValue({ fieldId, entityId, listEntryId, value }, apiKey) {
   try {
     return await setFieldValue({ fieldId, entityId, listEntryId, value }, apiKey);
@@ -244,16 +244,16 @@ async function upsertFieldValue({ fieldId, entityId, listEntryId, value }, apiKe
         f.field_id === fieldId &&
         (!listEntryId || f.list_entry_id === listEntryId)
       );
-      if (fv) return await updateFieldValue(fv.id, value, apiKey);
+      if (fv) {
+        // PATCH is not supported — DELETE the old value and POST the new one
+        try { await client.delete(`/field-values/${fv.id}`); } catch (de) {
+          console.log('[Affinity] delete field value error (non-fatal):', de.response?.status, de.message);
+        }
+        return await setFieldValue({ fieldId, entityId, listEntryId, value }, apiKey);
+      }
     }
     throw e;
   }
-}
-
-async function updateFieldValue(fieldValueId, value, apiKey) {
-  const client = getClient(apiKey);
-  const res = await client.patch(`/field-values/${fieldValueId}`, { value });
-  return res.data;
 }
 
 // ── High-level: add to sourcing list + set owner & priority ───────────────────
@@ -264,6 +264,7 @@ async function addToSourcingList({ orgId, senderName }, apiKey) {
     listEntry: null,
     ownerSet: false,
     priorityFieldValueId: null,
+    priorityContext: null,
     connectedOptionId: null,
     errors: [],
   };
@@ -352,6 +353,7 @@ async function addToSourcingList({ orgId, senderName }, apiKey) {
           value: chasingOption.id,
         }, apiKey);
         out.priorityFieldValueId = fv?.id || null;
+        out.priorityContext = { fieldId: priorityField.id, entityId: orgId, listEntryId: out.listEntry.id };
       } catch (e) {
         console.error('[Affinity] set priority error:', e.response?.status, JSON.stringify(e.response?.data));
         out.errors.push(`Set priority: ${e.message}`);
@@ -368,10 +370,30 @@ async function addToSourcingList({ orgId, senderName }, apiKey) {
 
 // ── Mark as Connected ─────────────────────────────────────────────────────────
 
-async function markConnected({ priorityFieldValueId, connectedOptionId }, apiKey) {
-  if (!priorityFieldValueId) throw new Error('No priority field value ID stored');
+async function markConnected({ priorityFieldValueId, priorityContext, connectedOptionId }, apiKey) {
   if (!connectedOptionId) throw new Error('No "Connected" option ID stored');
-  return updateFieldValue(priorityFieldValueId, connectedOptionId, apiKey);
+  const client = getClient(apiKey);
+
+  if (priorityContext?.fieldId) {
+    // DELETE existing value (if present), then POST the new "Connected" value
+    if (priorityFieldValueId) {
+      try { await client.delete(`/field-values/${priorityFieldValueId}`); } catch (de) {
+        console.log('[Affinity] markConnected delete error (non-fatal):', de.response?.status, de.message);
+      }
+    }
+    const res = await client.post('/field-values', {
+      field_id: priorityContext.fieldId,
+      entity_id: priorityContext.entityId,
+      list_entry_id: priorityContext.listEntryId,
+      value: connectedOptionId,
+    });
+    return res.data;
+  }
+
+  // Legacy fallback (no context stored)
+  if (!priorityFieldValueId) throw new Error('No priority field value ID or context stored');
+  const res = await client.patch(`/field-values/${priorityFieldValueId}`, { value: connectedOptionId });
+  return res.data;
 }
 
 // ── Set global owner on an organization ───────────────────────────────────────

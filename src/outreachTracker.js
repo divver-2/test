@@ -25,10 +25,10 @@ function save(data) {
 }
 
 // Save Affinity IDs for a domain so we can look them up on reply
-function saveTracking(domain, { priorityFieldValueId, connectedOptionId, orgId }) {
+function saveTracking(domain, { priorityFieldValueId, connectedOptionId, orgId, priorityContext }) {
   if (!domain || !priorityFieldValueId || !connectedOptionId) return;
   const data = load();
-  data[domain.toLowerCase()] = { priorityFieldValueId, connectedOptionId, orgId, savedAt: new Date().toISOString() };
+  data[domain.toLowerCase()] = { priorityFieldValueId, connectedOptionId, orgId, priorityContext: priorityContext || null, savedAt: new Date().toISOString() };
   save(data);
 }
 
