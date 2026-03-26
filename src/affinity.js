@@ -34,10 +34,24 @@ async function createOrganization({ name, domain }, apiKey) {
   return res.data;
 }
 
+// Split camelCase/PascalCase company names: "WitnessAI" → "Witness AI"
+function splitCamelCase(str) {
+  return str
+    .replace(/([a-z])([A-Z])/g, '$1 $2')
+    .replace(/([A-Z]+)([A-Z][a-z])/g, '$1 $2')
+    .trim();
+}
+
 async function upsertOrganization({ name, domain }, apiKey) {
-  // Try by name first, then by domain (catches mismatched names like "WitnessAI" vs "Witness AI")
+  // 1. Exact name search
   let existing = await findOrganization(name, apiKey);
+  // 2. Domain search (e.g. "witness.ai")
   if (!existing && domain) existing = await findOrganization(domain, apiKey);
+  // 3. CamelCase split (e.g. "WitnessAI" → "Witness AI")
+  if (!existing && name) {
+    const split = splitCamelCase(name);
+    if (split !== name) existing = await findOrganization(split, apiKey);
+  }
   if (existing) return { org: existing, created: false };
   const org = await createOrganization({ name, domain }, apiKey);
   return { org, created: true };
