@@ -321,6 +321,9 @@ async function addToSourcingList({ orgId, senderName }, apiKey) {
       o => o.text?.toLowerCase().includes('connect')
     );
 
+    console.log('[Affinity] listEntry:', JSON.stringify(out.listEntry));
+    console.log('[Affinity] chasingOption:', chasingOption, '| fieldId:', priorityField.id, '| orgId:', orgId);
+
     if (chasingOption) {
       try {
         const fv = await upsertFieldValue({
@@ -331,6 +334,7 @@ async function addToSourcingList({ orgId, senderName }, apiKey) {
         }, apiKey);
         out.priorityFieldValueId = fv?.id || null;
       } catch (e) {
+        console.error('[Affinity] set priority error:', e.response?.status, JSON.stringify(e.response?.data));
         out.errors.push(`Set priority: ${e.message}`);
       }
     }
