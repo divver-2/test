@@ -26,6 +26,20 @@ async function findOrganization(name, apiKey) {
   return exact || orgs[0] || null;
 }
 
+async function findOrganizationByDomain(domain, apiKey) {
+  if (!domain) return null;
+  const client = getClient(apiKey);
+  try {
+    const res = await client.get('/organizations', { params: { domain, page_size: 5, with_interaction_dates: true } });
+    const orgs = res.data?.organizations || (Array.isArray(res.data) ? res.data : []);
+    console.log(`[Affinity] findOrganizationByDomain("${domain}") → ${orgs.length} results:`, orgs.map(o => o.name));
+    return orgs[0] || null;
+  } catch (e) {
+    console.log('[Affinity] findOrganizationByDomain error:', e.response?.status, e.message);
+    return null;
+  }
+}
+
 async function createOrganization({ name, domain }, apiKey) {
   const client = getClient(apiKey);
   const payload = { name };
@@ -34,24 +48,12 @@ async function createOrganization({ name, domain }, apiKey) {
   return res.data;
 }
 
-// Split camelCase/PascalCase company names: "WitnessAI" → "Witness AI"
-function splitCamelCase(str) {
-  return str
-    .replace(/([a-z])([A-Z])/g, '$1 $2')
-    .replace(/([A-Z]+)([A-Z][a-z])/g, '$1 $2')
-    .trim();
-}
 
 async function upsertOrganization({ name, domain }, apiKey) {
-  // 1. Exact name search
-  let existing = await findOrganization(name, apiKey);
-  // 2. Domain search (e.g. "witness.ai")
-  if (!existing && domain) existing = await findOrganization(domain, apiKey);
-  // 3. CamelCase split (e.g. "WitnessAI" → "Witness AI")
-  if (!existing && name) {
-    const split = splitCamelCase(name);
-    if (split !== name) existing = await findOrganization(split, apiKey);
-  }
+  // 1. Domain lookup (most reliable — matches regardless of name format)
+  let existing = domain ? await findOrganizationByDomain(domain, apiKey) : null;
+  // 2. Name search fallback
+  if (!existing) existing = await findOrganization(name, apiKey);
   if (existing) return { org: existing, created: false };
   const org = await createOrganization({ name, domain }, apiKey);
   return { org, created: true };
