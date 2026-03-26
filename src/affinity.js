@@ -204,15 +204,20 @@ async function getGlobalFields(apiKey) {
 
 async function setFieldValue({ fieldId, entityId, listEntryId, value }, apiKey) {
   const client = getClient(apiKey);
-  const payload = { field_id: fieldId, value };
-  // For list-specific fields use list_entry_id only; for global fields use entity_id
-  if (listEntryId) {
-    payload.list_entry_id = listEntryId;
-  } else {
-    payload.entity_id = entityId;
+  // Always include entity_id; add list_entry_id for list-specific fields
+  const payload = { field_id: fieldId, entity_id: entityId, value };
+  if (listEntryId) payload.list_entry_id = listEntryId;
+  try {
+    const res = await client.post('/field-values', payload);
+    return res.data;
+  } catch (e) {
+    // If sending both fails, retry with entity_id only (some fields don't accept list_entry_id)
+    if (e.response?.status === 404 && listEntryId) {
+      const res = await client.post('/field-values', { field_id: fieldId, entity_id: entityId, value });
+      return res.data;
+    }
+    throw e;
   }
-  const res = await client.post('/field-values', payload);
-  return res.data;
 }
 
 // POST a new field value; if Affinity rejects (already exists), PATCH the existing one
