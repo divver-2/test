@@ -204,8 +204,13 @@ async function getGlobalFields(apiKey) {
 
 async function setFieldValue({ fieldId, entityId, listEntryId, value }, apiKey) {
   const client = getClient(apiKey);
-  const payload = { field_id: fieldId, entity_id: entityId, value };
-  if (listEntryId) payload.list_entry_id = listEntryId;
+  const payload = { field_id: fieldId, value };
+  // For list-specific fields use list_entry_id only; for global fields use entity_id
+  if (listEntryId) {
+    payload.list_entry_id = listEntryId;
+  } else {
+    payload.entity_id = entityId;
+  }
   const res = await client.post('/field-values', payload);
   return res.data;
 }
