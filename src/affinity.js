@@ -212,29 +212,12 @@ async function getGlobalFields(apiKey) {
 
 async function setFieldValue({ fieldId, entityId, listEntryId, value }, apiKey) {
   const client = getClient(apiKey);
-  const attempts = [
-    // 1. list_entry_id only (list-specific field)
-    listEntryId && { field_id: fieldId, list_entry_id: listEntryId, value },
-    // 2. entity_id + list_entry_id
-    listEntryId && { field_id: fieldId, entity_id: entityId, list_entry_id: listEntryId, value },
-    // 3. entity_id only
-    { field_id: fieldId, entity_id: entityId, value },
-    // 4. wrapped value (some Affinity dropdown fields expect { id: value })
-    listEntryId && { field_id: fieldId, list_entry_id: listEntryId, value: { id: value } },
-    { field_id: fieldId, entity_id: entityId, value: { id: value } },
-  ].filter(Boolean);
-
-  let lastErr;
-  for (const payload of attempts) {
-    try {
-      const res = await client.post('/field-values', payload);
-      return res.data;
-    } catch (e) {
-      console.log('[Affinity] setFieldValue attempt failed:', e.response?.status, JSON.stringify(e.response?.data), '| payload:', JSON.stringify(payload));
-      lastErr = e;
-    }
-  }
-  throw lastErr;
+  // Affinity requires both entity_id + list_entry_id for list fields, entity_id only for global fields
+  const payload = listEntryId
+    ? { field_id: fieldId, entity_id: entityId, list_entry_id: listEntryId, value }
+    : { field_id: fieldId, entity_id: entityId, value };
+  const res = await client.post('/field-values', payload);
+  return res.data;
 }
 
 // POST a new field value; if Affinity rejects (already exists), DELETE + POST
