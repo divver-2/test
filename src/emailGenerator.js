@@ -87,9 +87,9 @@ ${greeting}
 
 Hope all is well, I'm an investor at NewView Capital - a $3.1bn venture growth fund.
 
-I wanted to reach out as I've been spending time in [INDUSTRY_SEGMENT]. I've heard positive feedback on ${companyName || 'your company'}, specifically [SPECIFIC_OBSERVATION], and am very impressed with what you are building.
+I wanted to reach out as I've been spending time in [INDUSTRY_SEGMENT]. I've heard positive feedback on ${companyName || 'your company'}, specifically [SPECIFIC_OBSERVATION].
 
-I'm excited about what you are doing and wanted to see if it was a good time to connect.
+I am very impressed with what you are building and wanted to see if it was a good time to connect.
 
 Thanks,
 ${senderFirst}
@@ -128,9 +128,9 @@ ${context}`,
 
 Hope all is well, I'm an investor at NewView Capital - a $3.1bn venture growth fund.
 
-I wanted to reach out as ${themeLine}. I've heard positive feedback on ${companyName || 'your company'}, particularly around ${specificThing}, and am very impressed with what you are building.
+I wanted to reach out as ${themeLine}. I've heard positive feedback on ${companyName || 'your company'}, particularly around ${specificThing}.
 
-I'm excited about what you are doing and wanted to see if it was a good time to connect.
+I am very impressed with what you are building and wanted to see if it was a good time to connect.
 
 Thanks,
 ${senderFirst}`,
