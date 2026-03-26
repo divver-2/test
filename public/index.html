@@ -911,6 +911,8 @@ async function launchOutreach() {
   const btn = document.getElementById('launchBtn');
   btn.disabled = true;
   btn.textContent = 'Launching…';
+  const sendStatusEl = document.getElementById('sendStatus');
+  sendStatusEl.innerHTML = `<div style="color:var(--muted);font-size:0.82rem;padding:4px 0">Enrolling in Apollo sequence and syncing to Affinity…</div>`;
 
   try {
     const res = await fetch('/api/send-outreach', {
@@ -932,7 +934,7 @@ async function launchOutreach() {
     if (data.enrolled) {
       const aff = data.affinity;
       const affLine = aff?.addedToList
-        ? `Added to <b>${esc(aff.listName || 'sourcing list')}</b> · Status: <b>Chasing</b>${aff.globalOwner ? ` · Owner: <b>${esc(aff.globalOwner)}</b>` : ''}`
+        ? `Added to <b>${esc(aff.listName || 'Sourcing List')}</b>${aff.chasingSet ? ' · Status: <b>Chasing</b>' : ''}${aff.globalOwner ? ` · Owner: <b>${esc(aff.globalOwner)}</b>` : ''}`
         : (aff ? `<span style="color:var(--yellow)">⚠ Affinity: ${esc((aff.errors || []).join(', ') || 'not added to list')}</span>` : '');
       sendStatusEl.innerHTML = `<div class="send-status send-status-ok" style="margin:0 0 14px">
         <span class="send-status-icon">✅</span>

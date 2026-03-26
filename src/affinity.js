@@ -279,21 +279,19 @@ async function addToSourcingList({ orgId, senderName }, apiKey) {
     return out;
   }
 
-  console.log('[Affinity] list fields:', fields.map(f => f.name));
-  // Log full Priority field to see how options are structured
-  const priorityRaw = fields.find(f => f.name?.toLowerCase() === 'priority' || f.name?.toLowerCase() === 'status');
-  console.log('[Affinity] priority/status field raw:', JSON.stringify(priorityRaw));
+  console.log('[Affinity] list fields with options:', fields.map(f => ({
+    name: f.name, options: f.dropdown_options?.map(o => o.text)
+  })));
 
   const ownerField = fields.find(f => f.name?.toLowerCase().includes('owner'));
 
-  // Find whichever dropdown field has a "Chasing" option — don't assume the field name
+  // Find the field that specifically has a "Chasing" option
   const priorityField = fields.find(f =>
     f.dropdown_options?.some(o => o.text?.toLowerCase().includes('chasing')) ||
-    f.allowed_values?.some(o => o.text?.toLowerCase().includes('chasing')) ||
-    f.value_type === 7 // Affinity type 7 = ranked dropdown
-  ) || priorityRaw;
+    f.allowed_values?.some(o => o.text?.toLowerCase().includes('chasing'))
+  );
 
-  console.log('[Affinity] priorityField:', priorityField?.name, '| dropdown_options:', priorityField?.dropdown_options, '| allowed_values:', priorityField?.allowed_values);
+  console.log('[Affinity] priorityField:', priorityField?.name, '| options:', priorityField?.dropdown_options?.map(o => o.text));
 
   // 4. Set global owner from senderName
   if (ownerField && senderName) {
