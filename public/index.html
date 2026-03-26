@@ -375,6 +375,10 @@
     <div class="settings-title">Settings</div>
     <div style="display:flex;flex-direction:column;gap:12px">
       <div class="field">
+        <label>Your Name</label>
+        <input type="text" id="senderNameInput" placeholder="e.g. David Divver" autocomplete="off" />
+      </div>
+      <div class="field">
         <label>Apollo API Key</label>
         <input type="password" id="apolloKeyInput" placeholder="Paste your Apollo API key…" autocomplete="off" />
       </div>
@@ -598,6 +602,7 @@ async function addCompany() {
 // ── Settings / API keys ───────────────────────────────────
 function getApiKey()      { return localStorage.getItem('apollo_api_key') || ''; }
 function getAffinityKey() { return localStorage.getItem('affinity_api_key') || ''; }
+function getSenderName()  { return localStorage.getItem('sender_name') || 'David Divver'; }
 
 function toggleSettings() {
   const panel = document.getElementById('settingsPanel');
@@ -608,6 +613,7 @@ function toggleSettings() {
   } else {
     panel.classList.remove('hidden');
     requestAnimationFrame(() => requestAnimationFrame(() => panel.classList.add('open')));
+    document.getElementById('senderNameInput').value = getSenderName();
     document.getElementById('apolloKeyInput').value = getApiKey();
     document.getElementById('affinityKeyInput').value = getAffinityKey();
     setTimeout(() => document.getElementById('apolloKeyInput').focus(), 300);
@@ -615,8 +621,11 @@ function toggleSettings() {
 }
 
 function saveSettings() {
+  const senderName = document.getElementById('senderNameInput').value.trim();
   const apolloKey = document.getElementById('apolloKeyInput').value.trim();
   const affinityKey = document.getElementById('affinityKeyInput').value.trim();
+  if (senderName) localStorage.setItem('sender_name', senderName);
+  else localStorage.removeItem('sender_name');
   if (apolloKey) localStorage.setItem('apollo_api_key', apolloKey);
   else localStorage.removeItem('apollo_api_key');
   if (affinityKey) localStorage.setItem('affinity_api_key', affinityKey);
@@ -913,6 +922,7 @@ async function launchOutreach() {
         emailSequence: currentResult.emailSequence,
         apiKey,
         affinityKey: getAffinityKey(),
+        senderName: getSenderName(),
       }),
     });
     const data = await res.json();
