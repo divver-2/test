@@ -15,6 +15,14 @@ function getClient(apiKey) {
   });
 }
 
+function getClientV2(apiKey) {
+  return axios.create({
+    baseURL: 'https://api.affinity.co/v2',
+    auth: { username: '', password: apiKey },
+    headers: { 'Content-Type': 'application/json' },
+  });
+}
+
 // ── Organizations ─────────────────────────────────────────────────────────────
 
 async function findOrganization(name, apiKey) {
@@ -56,11 +64,38 @@ async function createOrganization({ name, domain }, apiKey) {
 }
 
 
+// Search Affinity v2 API for a company by domain — finds network/shared orgs that v1 search misses
+async function findOrganizationV2ByDomain(domain, apiKey) {
+  if (!domain) return null;
+  try {
+    const client = getClientV2(apiKey);
+    const res = await client.get('/companies', { params: { term: domain, page_size: 10 } });
+    const companies = res.data?.data || res.data?.companies || (Array.isArray(res.data) ? res.data : []);
+    console.log(`[Affinity v2] search("${domain}") → ${companies.length} results:`, companies.map(c => `${c.name}(${c.id})`));
+    const domainLower = domain.toLowerCase();
+    const match = companies.find(c => {
+      const domains = c.domain_names || c.domains || (c.domain ? [c.domain] : []);
+      return domains.some(d => d.toLowerCase() === domainLower);
+    });
+    if (match) {
+      // Normalize to v1 org shape
+      return { id: match.id, name: match.name, domain_names: match.domain_names || match.domains || [] };
+    }
+    return null;
+  } catch (e) {
+    console.log('[Affinity v2] search error:', e.response?.status, e.message);
+    return null;
+  }
+}
+
 async function upsertOrganization({ name, domain }, apiKey) {
-  // 1. Domain lookup (most reliable — matches regardless of name format)
-  let existing = domain ? await findOrganizationByDomain(domain, apiKey) : null;
-  // 2. Name search fallback
+  // 1. v2 domain search — finds network orgs that v1 search misses
+  let existing = domain ? await findOrganizationV2ByDomain(domain, apiKey) : null;
+  // 2. v1 domain search fallback
+  if (!existing && domain) existing = await findOrganizationByDomain(domain, apiKey);
+  // 3. v1 name search fallback
   if (!existing) existing = await findOrganization(name, apiKey);
+  console.log(`[Affinity] upsertOrganization("${name}") → existing:`, existing ? `${existing.name}(${existing.id})` : 'none — will create');
   if (existing) return { org: existing, created: false };
   const org = await createOrganization({ name, domain }, apiKey);
   return { org, created: true };
