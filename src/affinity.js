@@ -30,10 +30,16 @@ async function findOrganizationByDomain(domain, apiKey) {
   if (!domain) return null;
   const client = getClient(apiKey);
   try {
-    const res = await client.get('/organizations', { params: { domain, page_size: 5, with_interaction_dates: true } });
+    const res = await client.get('/organizations', { params: { domain, page_size: 10, with_interaction_dates: true } });
     const orgs = res.data?.organizations || (Array.isArray(res.data) ? res.data : []);
-    console.log(`[Affinity] findOrganizationByDomain("${domain}") → ${orgs.length} results:`, orgs.map(o => o.name));
-    return orgs[0] || null;
+    // Only return an org whose domain_names actually contains this domain (Affinity search is loose)
+    const domainLower = domain.toLowerCase();
+    const match = orgs.find(o => {
+      const names = o.domain_names || o.domains || [];
+      return names.some(d => d.toLowerCase() === domainLower) || o.domain?.toLowerCase() === domainLower;
+    });
+    console.log(`[Affinity] findOrganizationByDomain("${domain}") → match:`, match?.name || 'none');
+    return match || null;
   } catch (e) {
     console.log('[Affinity] findOrganizationByDomain error:', e.response?.status, e.message);
     return null;
