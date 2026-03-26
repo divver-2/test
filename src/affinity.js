@@ -35,7 +35,9 @@ async function createOrganization({ name, domain }, apiKey) {
 }
 
 async function upsertOrganization({ name, domain }, apiKey) {
-  const existing = await findOrganization(name, apiKey);
+  // Try by name first, then by domain (catches mismatched names like "WitnessAI" vs "Witness AI")
+  let existing = await findOrganization(name, apiKey);
+  if (!existing && domain) existing = await findOrganization(domain, apiKey);
   if (existing) return { org: existing, created: false };
   const org = await createOrganization({ name, domain }, apiKey);
   return { org, created: true };
