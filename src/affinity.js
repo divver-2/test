@@ -151,8 +151,8 @@ async function getLists(apiKey) {
 // Find the sourcing list — looks for a list whose name contains "sourcing"
 async function getSourcingList(apiKey) {
   const lists = await getLists(apiKey);
-  console.log('[Affinity] all lists:', lists.map(l => ({ id: l.id, name: l.name, type: l.type })));
   return (
+    lists.find(l => l.name?.toLowerCase() === 'sourcing list') ||
     lists.find(l => l.name?.toLowerCase().includes('sourcing')) ||
     lists.find(l => l.type === 8) ||
     lists[0] ||
