@@ -18,8 +18,10 @@ function getClient(apiKey) {
 function getClientV2(apiKey) {
   return axios.create({
     baseURL: 'https://api.affinity.co/v2',
-    auth: { username: '', password: apiKey },
-    headers: { 'Content-Type': 'application/json' },
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${apiKey}`,
+    },
   });
 }
 
@@ -450,8 +452,8 @@ async function markConnected({ priorityFieldValueId, priorityContext, connectedO
 // ── Set global owner on an organization ───────────────────────────────────────
 
 async function setGlobalOwner(orgId, ownerName, apiKey) {
+  const client = getClient(apiKey);
   const globalFields = await getGlobalFields(apiKey);
-  console.log('[Affinity] setGlobalOwner — globalFields:', globalFields.map(f => `${f.name}(${f.id},type=${f.value_type})`));
 
   const ownerField =
     globalFields.find(f => f.name?.toLowerCase() === 'global owner') ||
@@ -459,6 +461,17 @@ async function setGlobalOwner(orgId, ownerName, apiKey) {
     globalFields.find(f => f.name?.toLowerCase().includes('owner'));
   console.log('[Affinity] setGlobalOwner — ownerField:', ownerField ? `${ownerField.name}(${ownerField.id})` : 'NOT FOUND');
   if (!ownerField) return false;
+
+  // Check if there's already a global owner set — if so, don't overwrite
+  const existingFVs = await client.get('/field-values', { params: { organization_id: orgId } })
+    .then(r => Array.isArray(r.data) ? r.data : []).catch(() => []);
+  const existingOwnerFV = existingFVs.find(fv => fv.field_id === ownerField.id && fv.value != null);
+  if (existingOwnerFV) {
+    const users = await getUsers(apiKey);
+    const existingOwnerName = await resolveOwnerValue(existingOwnerFV.value, apiKey, users);
+    console.log('[Affinity] setGlobalOwner — existing owner found:', existingOwnerName, '— skipping overwrite');
+    return existingOwnerName || false;
+  }
 
   const user = await findUserByName(ownerName, apiKey);
   console.log('[Affinity] setGlobalOwner — user resolved:', user ? `${user.name || user.id}(id=${user.id})` : 'NOT FOUND');
