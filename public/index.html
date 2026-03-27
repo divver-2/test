@@ -441,7 +441,7 @@
           </div>
         </div>
         <div class="email-box">
-          <span class="email-addr" id="ceoEmail"></span>
+          <input type="email" id="ceoEmail" style="font-family:'SF Mono','Fira Code',monospace;font-size:0.845rem;flex:1;background:transparent;border:none;outline:none;color:var(--text);min-width:0;width:100%" placeholder="email not found — enter manually" />
           <span class="badge" id="emailBadge"></span>
         </div>
       </div>
@@ -696,7 +696,7 @@ async function improveEmail() {
     document.getElementById('improveInput').value = '';
 
     // Keep mailto link in sync
-    const mailto = `mailto:${esc(currentResult.ceo?.email || '')}?subject=${encodeURIComponent(data.subject || '')}&body=${encodeURIComponent(data.body || '')}`;
+    const mailto = `mailto:${esc(document.getElementById('ceoEmail').value.trim() || currentResult.ceo?.email || '')}?subject=${encodeURIComponent(data.subject || '')}&body=${encodeURIComponent(data.body || '')}`;
     document.getElementById('mailtoLink').href = mailto;
 
     // Keep emailSequence in sync so Launch uses the improved version
@@ -749,7 +749,7 @@ function renderResult(data) {
   document.getElementById('ceoAv').textContent    = initials;
   document.getElementById('ceoName').textContent  = ceo?.name  || 'CEO not found';
   document.getElementById('ceoTitle').textContent = ceo?.title || 'Chief Executive Officer';
-  document.getElementById('ceoEmail').textContent = ceo?.email || 'Email not available';
+  document.getElementById('ceoEmail').value = ceo?.email || '';
   const liEl = document.getElementById('ceoLinkedin');
   liEl.innerHTML = ceo?.linkedinUrl
     ? `<a href="${esc(ceo.linkedinUrl)}" target="_blank" rel="noopener">LinkedIn →</a>`
@@ -903,10 +903,14 @@ async function launchOutreach() {
   const apiKey = getApiKey();
   if (!apiKey) { setStatus('Please enter your Apollo API key in Settings (⚙ top right).', 'error'); return; }
 
-  if (!currentResult.ceo?.email) {
-    setStatus('No CEO email found — cannot launch outreach.', 'error');
+  // Use the (possibly manually edited) email field
+  const emailInput = document.getElementById('ceoEmail').value.trim();
+  if (!emailInput) {
+    setStatus('No CEO email — enter it manually in the email field above.', 'error');
     return;
   }
+  if (!currentResult.ceo) currentResult.ceo = {};
+  currentResult.ceo.email = emailInput;
 
   const btn = document.getElementById('launchBtn');
   btn.disabled = true;
