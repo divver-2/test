@@ -18,10 +18,8 @@ function getClient(apiKey) {
 function getClientV2(apiKey) {
   return axios.create({
     baseURL: 'https://api.affinity.co/v2',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${apiKey}`,
-    },
+    auth: { username: '', password: apiKey },
+    headers: { 'Content-Type': 'application/json' },
   });
 }
 
@@ -97,10 +95,9 @@ async function upsertOrganization({ name, domain }, apiKey) {
   if (!existing && domain) existing = await findOrganizationByDomain(domain, apiKey);
   // 3. v1 name search fallback
   if (!existing) existing = await findOrganization(name, apiKey);
-  console.log(`[Affinity] upsertOrganization("${name}") → existing:`, existing ? `${existing.name}(${existing.id})` : 'none — will create');
-  if (existing) return { org: existing, created: false };
-  const org = await createOrganization({ name, domain }, apiKey);
-  return { org, created: true };
+  console.log(`[Affinity] upsertOrganization("${name}") → existing:`, existing ? `${existing.name}(${existing.id})` : 'not found in Affinity — skipping');
+  // Never create — only update existing companies
+  return existing ? { org: existing, created: false } : { org: null, created: false };
 }
 
 // ── Persons ───────────────────────────────────────────────────────────────────

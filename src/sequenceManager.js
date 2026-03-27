@@ -471,7 +471,11 @@ async function launchEmailOutreach({ companyData, ceoData, emailSequence, apiKey
         { name: orgName, domain: companyData.domain },
         affinityKey
       );
-      console.log('[Affinity] org upserted:', org.id, org.name, '| created:', created);
+      if (!org) {
+        console.log('[Affinity] org not found in Affinity — skipping sourcing list sync');
+        results.affinity = { orgId: null, addedToList: false, chasingSet: false, notFound: true };
+      } else {
+      console.log('[Affinity] org found:', org.id, org.name, '| created:', created);
       if (ceoData?.firstName) {
         await affinity.upsertPerson({
           firstName: ceoData.firstName,
@@ -505,6 +509,7 @@ async function launchEmailOutreach({ companyData, ceoData, emailSequence, apiKey
           priorityContext: listResult.priorityContext || null,
         });
       }
+      } // end else (org found)
     } catch (e) {
       console.error('[Affinity] sync error:', e.response?.status, e.response?.data || e.message);
       results.errors.push(`Affinity sync: ${e.message}`);
