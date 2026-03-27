@@ -64,6 +64,37 @@ async function createOrganization({ name, domain }, apiKey) {
 }
 
 
+// Exhaustive scan through ALL organizations, matching by domain_names — last resort for network orgs
+// that don't appear in name or domain search results
+async function findOrganizationExhaustive(domain, apiKey) {
+  if (!domain) return null;
+  const client = getClient(apiKey);
+  const domainLower = domain.toLowerCase();
+  const MAX_PAGES = 20; // cap at 2000 orgs to avoid excessive API calls
+  console.log(`[Affinity] exhaustive domain scan for "${domain}"...`);
+  for (let page = 1; page <= MAX_PAGES; page++) {
+    try {
+      const res = await client.get('/organizations', { params: { page_size: 100, page } });
+      const orgs = res.data?.organizations || (Array.isArray(res.data) ? res.data : []);
+      if (!orgs.length) break;
+      const match = orgs.find(o => {
+        const names = o.domain_names || o.domains || [];
+        return names.some(d => d.toLowerCase() === domainLower) || o.domain?.toLowerCase() === domainLower;
+      });
+      if (match) {
+        console.log(`[Affinity] exhaustive scan found "${match.name}"(${match.id}) on page ${page}`);
+        return match;
+      }
+      if (orgs.length < 100) break;
+    } catch (e) {
+      console.log('[Affinity] exhaustive scan error:', e.response?.status, e.message);
+      break;
+    }
+  }
+  console.log(`[Affinity] exhaustive scan: "${domain}" not found`);
+  return null;
+}
+
 // Search Affinity v2 API for a company by domain — finds network/shared orgs that v1 search misses
 async function findOrganizationV2ByDomain(domain, apiKey) {
   if (!domain) return null;
@@ -142,6 +173,8 @@ async function upsertOrganization({ name, domain, affinityOrgId }, apiKey) {
     const root = domain.split('.')[0];
     if (root && root !== name.toLowerCase()) existing = await findOrganization(root, apiKey);
   }
+  // 5. Exhaustive page-through — catches network orgs invisible to search
+  if (!existing && domain) existing = await findOrganizationExhaustive(domain, apiKey);
   console.log(`[Affinity] upsertOrganization("${name}") → existing:`, existing ? `${existing.name}(${existing.id})` : 'not found in Affinity — skipping');
   return existing ? { org: existing, created: false } : { org: null, created: false };
 }
@@ -535,9 +568,11 @@ async function setGlobalOwner(orgId, ownerName, apiKey) {
 async function lookupCompanyInAffinity(companyName, apiKey, domain, ceoEmail) {
   const client = getClient(apiKey);
 
-  // Try by name first, fall back to domain search
+  // Try by name, then domain search, then exhaustive scan
   let org = await findOrganization(companyName, apiKey);
-  if (!org && domain) org = await findOrganization(domain, apiKey);
+  if (!org && domain) org = await findOrganizationByDomain(domain, apiKey);
+  if (!org) org = await findOrganization(domain || companyName, apiKey);
+  if (!org && domain) org = await findOrganizationExhaustive(domain, apiKey);
   if (!org) return null;
 
   const result = {

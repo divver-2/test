@@ -381,11 +381,12 @@ async function runOutreachByCompany({ companyName, apiKey, affinityKey }) {
     },
     affinity: results.affinityData ? {
       inAffinity: true,
+      orgId: results.affinityData.orgId || null,
       owner: results.affinityData.owner,
       owners: results.affinityData.owners || [],
       emailsSent: results.affinityData.emailsSent,
       lastEmailDate: results.affinityData.lastEmailDate,
-    } : { inAffinity: false, owner: null, owners: [], emailsSent: 0, lastEmailDate: null },
+    } : { inAffinity: false, orgId: null, owner: null, owners: [], emailsSent: 0, lastEmailDate: null },
     emailDraft: emailSequence[0] || null,
     emailSequence,
     errors: results.errors,
