@@ -78,25 +78,68 @@ async function findOrganizationV2ByDomain(domain, apiKey) {
       return domains.some(d => d.toLowerCase() === domainLower);
     });
     if (match) {
-      // Normalize to v1 org shape
       return { id: match.id, name: match.name, domain_names: match.domain_names || match.domains || [] };
     }
     return null;
   } catch (e) {
-    console.log('[Affinity v2] search error:', e.response?.status, e.message);
+    console.log('[Affinity v2] search error:', e.response?.status, JSON.stringify(e.response?.data));
     return null;
   }
 }
 
-async function upsertOrganization({ name, domain }, apiKey) {
+// Search by CEO email — find the person in Affinity, then get their org
+async function findOrganizationByCeoEmail(ceoEmail, apiKey) {
+  if (!ceoEmail) return null;
+  const client = getClient(apiKey);
+  try {
+    const res = await client.get('/persons', { params: { term: ceoEmail, page_size: 10 } });
+    const people = res.data?.persons || (Array.isArray(res.data) ? res.data : []);
+    const emailLower = ceoEmail.toLowerCase();
+    for (const person of people) {
+      const emails = [person.primary_email, ...(person.emails || [])].filter(Boolean);
+      if (!emails.some(e => e.toLowerCase() === emailLower)) continue;
+      const orgId = person.organization_ids?.[0];
+      if (!orgId) continue;
+      const orgRes = await client.get(`/organizations/${orgId}`);
+      const org = orgRes.data;
+      console.log(`[Affinity] findOrgByCeoEmail("${ceoEmail}") → found org: ${org?.name}(${org?.id})`);
+      return org;
+    }
+    console.log(`[Affinity] findOrgByCeoEmail("${ceoEmail}") → no match`);
+    return null;
+  } catch (e) {
+    console.log('[Affinity] findOrgByCeoEmail error:', e.response?.status, e.message);
+    return null;
+  }
+}
+
+// Get an org directly by Affinity org ID (manual override)
+async function getOrganizationById(orgId, apiKey) {
+  if (!orgId) return null;
+  try {
+    const res = await getClient(apiKey).get(`/organizations/${orgId}`);
+    return res.data || null;
+  } catch (e) {
+    console.log('[Affinity] getOrganizationById error:', e.response?.status, e.message);
+    return null;
+  }
+}
+
+async function upsertOrganization({ name, domain, ceoEmail, affinityOrgId }, apiKey) {
+  // 0. Manual Affinity org ID override
+  if (affinityOrgId) {
+    const org = await getOrganizationById(affinityOrgId, apiKey);
+    if (org) { console.log(`[Affinity] using manual org ID ${affinityOrgId} → ${org.name}`); return { org, created: false }; }
+  }
   // 1. v2 domain search — finds network orgs that v1 search misses
   let existing = domain ? await findOrganizationV2ByDomain(domain, apiKey) : null;
   // 2. v1 domain search fallback
   if (!existing && domain) existing = await findOrganizationByDomain(domain, apiKey);
   // 3. v1 name search fallback
   if (!existing) existing = await findOrganization(name, apiKey);
+  // 4. CEO email search — find the person in Affinity then get their org
+  if (!existing && ceoEmail) existing = await findOrganizationByCeoEmail(ceoEmail, apiKey);
   console.log(`[Affinity] upsertOrganization("${name}") → existing:`, existing ? `${existing.name}(${existing.id})` : 'not found in Affinity — skipping');
-  // Never create — only update existing companies
   return existing ? { org: existing, created: false } : { org: null, created: false };
 }
 

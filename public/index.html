@@ -470,6 +470,10 @@
         <a class="btn-mailto" id="mailtoLink" href="#">Open in Email App</a>
         <button class="btn btn-primary" id="launchBtn" onclick="launchOutreach()" style="padding:8px 18px;font-size:0.85rem">Sequence Launch</button>
       </div>
+      <div style="margin-top:10px;display:flex;align-items:center;gap:8px">
+        <span style="font-size:0.75rem;color:var(--muted);white-space:nowrap">Affinity Org ID (optional):</span>
+        <input type="text" id="affinityOrgId" placeholder="e.g. 123456789 — paste from Affinity URL if not auto-found" style="font-size:0.75rem;background:transparent;border:1px solid var(--border);border-radius:6px;padding:4px 8px;color:var(--text);width:100%;outline:none" />
+      </div>
     </div>
   </div>
 
@@ -923,7 +927,7 @@ async function launchOutreach() {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        companyData: currentResult.company,
+        companyData: { ...currentResult.company, affinityOrgId: document.getElementById('affinityOrgId').value.trim() || null },
         ceoData: currentResult.ceo,
         emailSequence: currentResult.emailSequence,
         apiKey,
