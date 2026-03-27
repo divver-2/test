@@ -125,20 +125,23 @@ async function getOrganizationById(orgId, apiKey) {
   }
 }
 
-async function upsertOrganization({ name, domain, ceoEmail, affinityOrgId }, apiKey) {
+async function upsertOrganization({ name, domain, affinityOrgId }, apiKey) {
   // 0. Manual Affinity org ID override
   if (affinityOrgId) {
     const org = await getOrganizationById(affinityOrgId, apiKey);
     if (org) { console.log(`[Affinity] using manual org ID ${affinityOrgId} → ${org.name}`); return { org, created: false }; }
   }
-  // 1. v2 domain search — finds network orgs that v1 search misses
+  // 1. v2 domain search
   let existing = domain ? await findOrganizationV2ByDomain(domain, apiKey) : null;
-  // 2. v1 domain search fallback
+  // 2. v1 domain_name parameter search
   if (!existing && domain) existing = await findOrganizationByDomain(domain, apiKey);
-  // 3. v1 name search fallback
+  // 3. v1 name search
   if (!existing) existing = await findOrganization(name, apiKey);
-  // 4. CEO email search — find the person in Affinity then get their org
-  if (!existing && ceoEmail) existing = await findOrganizationByCeoEmail(ceoEmail, apiKey);
+  // 4. v1 search using just the domain root (e.g. "langdock" from "langdock.com")
+  if (!existing && domain) {
+    const root = domain.split('.')[0];
+    if (root && root !== name.toLowerCase()) existing = await findOrganization(root, apiKey);
+  }
   console.log(`[Affinity] upsertOrganization("${name}") → existing:`, existing ? `${existing.name}(${existing.id})` : 'not found in Affinity — skipping');
   return existing ? { org: existing, created: false } : { org: null, created: false };
 }
