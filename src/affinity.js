@@ -64,29 +64,43 @@ async function createOrganization({ name, domain }, apiKey) {
 }
 
 
-// Exhaustive scan through ALL organizations, matching by domain_names — last resort for network orgs
-// that don't appear in name or domain search results
-async function findOrganizationExhaustive(domain, apiKey) {
-  if (!domain) return null;
+function normalizeDomain(d) {
+  return (d || '').toLowerCase().replace(/^www\./, '');
+}
+
+// Exhaustive scan through ALL organizations — matches by domain OR name, prefers workspace (non-global) orgs
+async function findOrganizationExhaustive(domain, name, apiKey) {
+  if (!domain && !name) return null;
   const client = getClient(apiKey);
-  const domainLower = domain.toLowerCase();
-  const MAX_PAGES = 20; // cap at 2000 orgs to avoid excessive API calls
-  console.log(`[Affinity] exhaustive domain scan for "${domain}"...`);
-  let globalFallback = null; // keep scanning — prefer workspace orgs over global/network orgs
+  const domainNorm = domain ? normalizeDomain(domain) : null;
+  const nameLower = name ? name.toLowerCase() : null;
+  const MAX_PAGES = 20;
+  console.log(`[Affinity] exhaustive scan — domain:"${domain}" name:"${name}"...`);
+  let globalDomainFallback = null;
+  let workspaceNameMatch = null;
   for (let page = 1; page <= MAX_PAGES; page++) {
     try {
       const res = await client.get('/organizations', { params: { page_size: 100, page } });
       const orgs = res.data?.organizations || (Array.isArray(res.data) ? res.data : []);
       if (!orgs.length) break;
       for (const o of orgs) {
-        const names = o.domain_names || o.domains || [];
-        const domainMatch = names.some(d => d.toLowerCase() === domainLower) || o.domain?.toLowerCase() === domainLower;
-        if (!domainMatch) continue;
-        if (!o.global) {
-          console.log(`[Affinity] exhaustive scan found workspace org "${o.name}"(${o.id}) on page ${page}`);
-          return o; // workspace org — use immediately
+        const isGlobal = !!o.global;
+        // Domain match
+        if (domainNorm) {
+          const domains = o.domain_names || o.domains || [];
+          const domainMatch = domains.some(d => normalizeDomain(d) === domainNorm) || normalizeDomain(o.domain) === domainNorm;
+          if (domainMatch) {
+            if (!isGlobal) { console.log(`[Affinity] exhaustive: workspace domain match "${o.name}"(${o.id})`); return o; }
+            if (!globalDomainFallback) globalDomainFallback = o;
+          }
         }
-        if (!globalFallback) globalFallback = o; // save global match as fallback only
+        // Name match (workspace only — global name matches are unreliable)
+        if (nameLower && !isGlobal && !workspaceNameMatch) {
+          if (o.name?.toLowerCase() === nameLower) {
+            workspaceNameMatch = o;
+            console.log(`[Affinity] exhaustive: workspace name match "${o.name}"(${o.id})`);
+          }
+        }
       }
       if (orgs.length < 100) break;
     } catch (e) {
@@ -94,12 +108,9 @@ async function findOrganizationExhaustive(domain, apiKey) {
       break;
     }
   }
-  if (globalFallback) {
-    console.log(`[Affinity] exhaustive scan: only global org found — "${globalFallback.name}"(${globalFallback.id})`);
-    return globalFallback;
-  }
-  console.log(`[Affinity] exhaustive scan: "${domain}" not found`);
-  return null;
+  const result = globalDomainFallback || workspaceNameMatch || null;
+  console.log(`[Affinity] exhaustive scan done → ${result ? `${result.name}(${result.id})` : 'not found'}`);
+  return result;
 }
 
 // Search Affinity v2 API for a company by domain — finds network/shared orgs that v1 search misses
@@ -177,10 +188,10 @@ async function upsertOrganization({ name, domain, affinityOrgId }, apiKey) {
     existing = await findOrganizationV2ByDomain(domain, apiKey);
     // 2. v1 domain_name parameter search
     if (!existing) existing = await findOrganizationByDomain(domain, apiKey);
-    // 3. Exhaustive page-through — catches network orgs invisible to search
-    if (!existing) existing = await findOrganizationExhaustive(domain, apiKey);
   }
-  // 4. Name search only as last resort (no domain, or domain searches all failed)
+  // 3. Exhaustive scan — matches by domain AND name, prefers workspace orgs over global
+  if (!existing) existing = await findOrganizationExhaustive(domain, name, apiKey);
+  // 4. Name search only as absolute last resort
   if (!existing) existing = await findOrganization(name, apiKey);
   console.log(`[Affinity] upsertOrganization("${name}") → existing:`, existing ? `${existing.name}(${existing.id})` : 'not found in Affinity — skipping');
   return existing ? { org: existing, created: false } : { org: null, created: false };
@@ -579,7 +590,7 @@ async function lookupCompanyInAffinity(companyName, apiKey, domain, ceoEmail) {
   let org = await findOrganization(companyName, apiKey);
   if (!org && domain) org = await findOrganizationByDomain(domain, apiKey);
   if (!org) org = await findOrganization(domain || companyName, apiKey);
-  if (!org && domain) org = await findOrganizationExhaustive(domain, apiKey);
+  if (!org && (domain || companyName)) org = await findOrganizationExhaustive(domain, companyName, apiKey);
   if (!org) return null;
 
   const result = {
