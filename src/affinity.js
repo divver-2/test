@@ -169,19 +169,19 @@ async function upsertOrganization({ name, domain, affinityOrgId }, apiKey) {
     const org = await getOrganizationById(affinityOrgId, apiKey);
     if (org) { console.log(`[Affinity] using manual org ID ${affinityOrgId} → ${org.name}`); return { org, created: false }; }
   }
-  // 1. v2 domain search
-  let existing = domain ? await findOrganizationV2ByDomain(domain, apiKey) : null;
-  // 2. v1 domain_name parameter search
-  if (!existing && domain) existing = await findOrganizationByDomain(domain, apiKey);
-  // 3. v1 name search
-  if (!existing) existing = await findOrganization(name, apiKey);
-  // 4. v1 search using just the domain root (e.g. "langdock" from "langdock.com")
-  if (!existing && domain) {
-    const root = domain.split('.')[0];
-    if (root && root !== name.toLowerCase()) existing = await findOrganization(root, apiKey);
+  // When a domain is available, trust domain-based searches over name searches.
+  // Name searches (e.g. "Diligent") can return the wrong company.
+  let existing = null;
+  if (domain) {
+    // 1. v2 domain search
+    existing = await findOrganizationV2ByDomain(domain, apiKey);
+    // 2. v1 domain_name parameter search
+    if (!existing) existing = await findOrganizationByDomain(domain, apiKey);
+    // 3. Exhaustive page-through — catches network orgs invisible to search
+    if (!existing) existing = await findOrganizationExhaustive(domain, apiKey);
   }
-  // 5. Exhaustive page-through — catches network orgs invisible to search
-  if (!existing && domain) existing = await findOrganizationExhaustive(domain, apiKey);
+  // 4. Name search only as last resort (no domain, or domain searches all failed)
+  if (!existing) existing = await findOrganization(name, apiKey);
   console.log(`[Affinity] upsertOrganization("${name}") → existing:`, existing ? `${existing.name}(${existing.id})` : 'not found in Affinity — skipping');
   return existing ? { org: existing, created: false } : { org: null, created: false };
 }
