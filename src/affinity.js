@@ -27,12 +27,22 @@ function getClientV2(apiKey) {
 
 async function findOrganization(name, apiKey) {
   const client = getClient(apiKey);
-  const res = await client.get('/organizations', { params: { term: name, page_size: 5, with_interaction_dates: true } });
+  const res = await client.get('/organizations', { params: { term: name, page_size: 100, with_interaction_dates: true } });
   console.log(`[Affinity] findOrganization("${name}") raw keys:`, Object.keys(res.data || {}));
   const orgs = res.data?.organizations || (Array.isArray(res.data) ? res.data : []);
   console.log(`[Affinity] findOrganization("${name}") → ${orgs.length} results:`, orgs.map(o => `${o.name}(${o.id})`));
-  const exact = orgs.find(o => o.name?.toLowerCase() === name.toLowerCase());
-  return exact || orgs[0] || null;
+  const matches = orgs.filter(o => o.name?.toLowerCase() === name.toLowerCase());
+  if (matches.length > 1) {
+    // Multiple orgs with same name — prefer the one NVC has actually interacted with
+    const withInteraction = matches.find(o =>
+      o.interaction_dates?.last_email_date || o.interaction_dates?.last_interaction_date
+    );
+    if (withInteraction) { console.log(`[Affinity] findOrganization: preferred interaction org ${withInteraction.name}(${withInteraction.id})`); return withInteraction; }
+    // Prefer non-global (workspace) org
+    const workspace = matches.find(o => !o.global);
+    if (workspace) return workspace;
+  }
+  return matches[0] || orgs[0] || null;
 }
 
 async function findOrganizationByDomain(domain, apiKey) {
