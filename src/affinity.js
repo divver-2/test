@@ -74,7 +74,7 @@ async function findOrganizationExhaustive(domain, name, apiKey) {
   const client = getClient(apiKey);
   const domainNorm = domain ? normalizeDomain(domain) : null;
   const nameLower = name ? name.toLowerCase() : null;
-  const MAX_PAGES = 20;
+  const MAX_PAGES = 100;
   console.log(`[Affinity] exhaustive scan — domain:"${domain}" name:"${name}"...`);
   let globalDomainFallback = null;
   let workspaceNameMatch = null;
@@ -174,7 +174,7 @@ async function getOrganizationById(orgId, apiKey) {
   }
 }
 
-async function upsertOrganization({ name, domain, affinityOrgId }, apiKey) {
+async function upsertOrganization({ name, domain, affinityOrgId, ceoEmail }, apiKey) {
   // 0. Manual Affinity org ID override
   if (affinityOrgId) {
     const org = await getOrganizationById(affinityOrgId, apiKey);
@@ -189,9 +189,11 @@ async function upsertOrganization({ name, domain, affinityOrgId }, apiKey) {
     // 2. v1 domain_name parameter search
     if (!existing) existing = await findOrganizationByDomain(domain, apiKey);
   }
-  // 3. Exhaustive scan — matches by domain AND name, prefers workspace orgs over global
+  // 3. CEO email → find person in Affinity → get their org
+  if (!existing && ceoEmail) existing = await findOrganizationByCeoEmail(ceoEmail, apiKey);
+  // 4. Exhaustive scan — matches by domain AND name, prefers workspace orgs over global
   if (!existing) existing = await findOrganizationExhaustive(domain, name, apiKey);
-  // 4. Name search only as absolute last resort
+  // 5. Name search only as absolute last resort
   if (!existing) existing = await findOrganization(name, apiKey);
   console.log(`[Affinity] upsertOrganization("${name}") → existing:`, existing ? `${existing.name}(${existing.id})` : 'not found in Affinity — skipping');
   return existing ? { org: existing, created: false } : { org: null, created: false };
