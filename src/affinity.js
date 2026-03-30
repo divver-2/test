@@ -72,24 +72,31 @@ async function findOrganizationExhaustive(domain, apiKey) {
   const domainLower = domain.toLowerCase();
   const MAX_PAGES = 20; // cap at 2000 orgs to avoid excessive API calls
   console.log(`[Affinity] exhaustive domain scan for "${domain}"...`);
+  let globalFallback = null; // keep scanning — prefer workspace orgs over global/network orgs
   for (let page = 1; page <= MAX_PAGES; page++) {
     try {
       const res = await client.get('/organizations', { params: { page_size: 100, page } });
       const orgs = res.data?.organizations || (Array.isArray(res.data) ? res.data : []);
       if (!orgs.length) break;
-      const match = orgs.find(o => {
+      for (const o of orgs) {
         const names = o.domain_names || o.domains || [];
-        return names.some(d => d.toLowerCase() === domainLower) || o.domain?.toLowerCase() === domainLower;
-      });
-      if (match) {
-        console.log(`[Affinity] exhaustive scan found "${match.name}"(${match.id}) on page ${page}`);
-        return match;
+        const domainMatch = names.some(d => d.toLowerCase() === domainLower) || o.domain?.toLowerCase() === domainLower;
+        if (!domainMatch) continue;
+        if (!o.global) {
+          console.log(`[Affinity] exhaustive scan found workspace org "${o.name}"(${o.id}) on page ${page}`);
+          return o; // workspace org — use immediately
+        }
+        if (!globalFallback) globalFallback = o; // save global match as fallback only
       }
       if (orgs.length < 100) break;
     } catch (e) {
       console.log('[Affinity] exhaustive scan error:', e.response?.status, e.message);
       break;
     }
+  }
+  if (globalFallback) {
+    console.log(`[Affinity] exhaustive scan: only global org found — "${globalFallback.name}"(${globalFallback.id})`);
+    return globalFallback;
   }
   console.log(`[Affinity] exhaustive scan: "${domain}" not found`);
   return null;
