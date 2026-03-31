@@ -140,11 +140,16 @@ async function findOrganizationExhaustive(domain, name, apiKey) {
             if (!globalDomainFallback) globalDomainFallback = o;
           }
         }
-        // Name match (workspace only — global name matches are unreliable)
-        if (nameLower && !isGlobal && !workspaceNameMatch) {
+        // Name match — prefer workspace orgs, but accept global if nothing else found
+        if (nameLower && !workspaceNameMatch) {
           if (o.name?.toLowerCase() === nameLower) {
-            workspaceNameMatch = o;
-            console.log(`[Affinity] exhaustive: workspace name match "${o.name}"(${o.id})`);
+            if (!isGlobal) {
+              workspaceNameMatch = o;
+              console.log(`[Affinity] exhaustive: workspace name match "${o.name}"(${o.id})`);
+            } else if (!globalDomainFallback) {
+              globalDomainFallback = o; // use global name match as last resort
+              console.log(`[Affinity] exhaustive: global name match "${o.name}"(${o.id})`);
+            }
           }
         }
       }
@@ -270,8 +275,20 @@ async function upsertOrganization({ name, domain, affinityOrgId, ceoEmail, ceoFi
   // 3. Name search as absolute last resort
   if (!existing) existing = await findOrganization(name, apiKey);
   const foundByNameOnly = !!(existing && !affinityOrgId && !v2Result && !v1Result && !emailResult && !nameResult && !domain);
-  console.log(`[Affinity] upsertOrganization("${name}") → existing:`, existing ? `${existing.name}(${existing.id})` : 'not found in Affinity');
-  return existing ? { org: existing, created: false, foundByNameOnly } : { org: null, created: false };
+  if (existing) {
+    console.log(`[Affinity] upsertOrganization("${name}") → found: ${existing.name}(${existing.id})`);
+    return { org: existing, created: false, foundByNameOnly };
+  }
+  // Not found — create it so it gets added to the sourcing list
+  console.log(`[Affinity] upsertOrganization("${name}") → not found, creating new org`);
+  try {
+    const created = await createOrganization({ name, domain }, apiKey);
+    console.log(`[Affinity] created new org: ${created.name}(${created.id})`);
+    return { org: created, created: true };
+  } catch (e) {
+    console.log('[Affinity] createOrganization error:', e.response?.status, e.message);
+    return { org: null, created: false };
+  }
 }
 
 // ── Persons ───────────────────────────────────────────────────────────────────
