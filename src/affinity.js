@@ -16,10 +16,11 @@ function getClient(apiKey) {
 }
 
 function getClientV2(apiKey) {
+  // v2 uses Bearer token — may be a separate token from the v1 API key
+  const v2Token = process.env.AFFINITY_V2_TOKEN || apiKey;
   return axios.create({
     baseURL: 'https://api.affinity.co/v2',
-    auth: { username: '', password: apiKey },
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${v2Token}` },
   });
 }
 
