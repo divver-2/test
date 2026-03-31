@@ -472,7 +472,7 @@
       </div>
       <div style="margin-top:10px;display:flex;align-items:center;gap:8px">
         <span style="font-size:0.75rem;color:var(--muted);white-space:nowrap">Affinity Org ID (optional):</span>
-        <input type="text" id="affinityOrgId" placeholder="Auto-filled if found — or paste from Affinity URL" style="font-size:0.75rem;background:transparent;border:1px solid var(--border);border-radius:6px;padding:4px 8px;color:var(--text);width:100%;outline:none" />
+        <input type="text" id="affinityOrgId" placeholder="Auto-filled if found — or paste Affinity URL or ID" style="font-size:0.75rem;background:transparent;border:1px solid var(--border);border-radius:6px;padding:4px 8px;color:var(--text);width:100%;outline:none" oninput="extractAffinityId(this)" />
       </div>
     </div>
   </div>
@@ -911,6 +911,13 @@ async function markConnected(historyIdx) {
 }
 
 // ── Launch outreach ───────────────────────────────────────
+function extractAffinityId(input) {
+  const val = input.value.trim();
+  // Accept full Affinity URL e.g. https://newview.affinity.co/companies/311579283
+  const match = val.match(/\/companies\/(\d+)/);
+  if (match) { input.value = match[1]; input.style.color = 'var(--green, #4ade80)'; }
+}
+
 async function launchOutreach() {
   if (!currentResult) return;
 

@@ -27,22 +27,28 @@ function getClientV2(apiKey) {
 
 async function findOrganization(name, apiKey) {
   const client = getClient(apiKey);
-  const res = await client.get('/organizations', { params: { term: name, page_size: 100, with_interaction_dates: true } });
-  console.log(`[Affinity] findOrganization("${name}") raw keys:`, Object.keys(res.data || {}));
-  const orgs = res.data?.organizations || (Array.isArray(res.data) ? res.data : []);
-  console.log(`[Affinity] findOrganization("${name}") → ${orgs.length} results:`, orgs.map(o => `${o.name}(${o.id})`));
-  const matches = orgs.filter(o => o.name?.toLowerCase() === name.toLowerCase());
-  if (matches.length > 1) {
-    // Multiple orgs with same name — prefer the one NVC has actually interacted with
-    const withInteraction = matches.find(o =>
-      o.interaction_dates?.last_email_date || o.interaction_dates?.last_interaction_date
-    );
-    if (withInteraction) { console.log(`[Affinity] findOrganization: preferred interaction org ${withInteraction.name}(${withInteraction.id})`); return withInteraction; }
-    // Prefer non-global (workspace) org
-    const workspace = matches.find(o => !o.global);
-    if (workspace) return workspace;
-  }
-  return matches[0] || orgs[0] || null;
+  const nameLower = name.toLowerCase();
+  let allOrgs = [];
+  let pageToken = null;
+  // Paginate through ALL results — org may be on page 2+
+  do {
+    const params = { term: name, page_size: 100, with_interaction_dates: true };
+    if (pageToken) params.page_token = pageToken;
+    const res = await client.get('/organizations', { params });
+    const orgs = res.data?.organizations || (Array.isArray(res.data) ? res.data : []);
+    allOrgs = allOrgs.concat(orgs);
+    pageToken = res.data?.next_page_token || null;
+  } while (pageToken);
+  console.log(`[Affinity] findOrganization("${name}") → ${allOrgs.length} total results`);
+  const matches = allOrgs.filter(o => o.name?.toLowerCase() === nameLower);
+  if (!matches.length) return allOrgs[0] || null;
+  // Prefer: non-global with interaction > non-global > global with interaction > global
+  return (
+    matches.find(o => !o.global && (o.interaction_dates?.last_email_date || o.interaction_dates?.last_interaction_date)) ||
+    matches.find(o => !o.global) ||
+    matches.find(o => o.interaction_dates?.last_email_date || o.interaction_dates?.last_interaction_date) ||
+    matches[0]
+  );
 }
 
 async function findOrganizationByDomain(domain, apiKey) {

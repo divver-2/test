@@ -28,7 +28,8 @@ function save(data) {
 function saveTracking(domain, { priorityFieldValueId, connectedOptionId, orgId, priorityContext }) {
   if (!domain || !priorityFieldValueId || !connectedOptionId) return;
   const data = load();
-  data[domain.toLowerCase()] = { priorityFieldValueId, connectedOptionId, orgId, priorityContext: priorityContext || null, savedAt: new Date().toISOString() };
+  const key = domain.toLowerCase();
+  data[key] = { ...( data[key] || {}), priorityFieldValueId, connectedOptionId, orgId, priorityContext: priorityContext || null, savedAt: new Date().toISOString() };
   save(data);
 }
 
@@ -39,4 +40,21 @@ function getTracking(domain) {
   return data[domain.toLowerCase()] || null;
 }
 
-module.exports = { saveTracking, getTracking };
+// Cache a confirmed domain → Affinity org ID mapping so future lookups skip the search
+function learnOrgId(domain, orgId) {
+  if (!domain || !orgId) return;
+  const data = load();
+  const key = domain.toLowerCase();
+  if (data[key]?.orgId === orgId) return; // already known
+  data[key] = { ...(data[key] || {}), orgId, learnedAt: new Date().toISOString() };
+  save(data);
+  console.log(`[tracker] Learned Affinity org mapping: ${domain} → ${orgId}`);
+}
+
+// Get cached org ID for a domain (learned from prior launches)
+function getCachedOrgId(domain) {
+  if (!domain) return null;
+  return getTracking(domain)?.orgId || null;
+}
+
+module.exports = { saveTracking, getTracking, learnOrgId, getCachedOrgId };
