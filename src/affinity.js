@@ -269,18 +269,8 @@ async function upsertOrganization({ name, domain, affinityOrgId, ceoEmail, ceoFi
   // 3. Name search as absolute last resort
   if (!existing) existing = await findOrganization(name, apiKey);
   const foundByNameOnly = !!(existing && !affinityOrgId && !v2Result && !v1Result && !emailResult && !nameResult && !domain);
-  console.log(`[Affinity] upsertOrganization("${name}") → existing:`, existing ? `${existing.name}(${existing.id})` : 'not found — creating new org');
-  if (!existing) {
-    try {
-      const created = await createOrganization({ name, domain }, apiKey);
-      console.log(`[Affinity] created new org: ${created.name}(${created.id})`);
-      return { org: created, created: true };
-    } catch (e) {
-      console.log('[Affinity] createOrganization error:', e.response?.status, e.message);
-      return { org: null, created: false };
-    }
-  }
-  return { org: existing, created: false, foundByNameOnly };
+  console.log(`[Affinity] upsertOrganization("${name}") → existing:`, existing ? `${existing.name}(${existing.id})` : 'not found in Affinity');
+  return existing ? { org: existing, created: false, foundByNameOnly } : { org: null, created: false };
 }
 
 // ── Persons ───────────────────────────────────────────────────────────────────
