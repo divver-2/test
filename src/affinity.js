@@ -240,8 +240,9 @@ async function upsertOrganization({ name, domain, affinityOrgId, ceoEmail, ceoFi
   if (!existing) existing = await findOrganizationExhaustive(domain, name, apiKey);
   // 5. Name search only as absolute last resort
   if (!existing) existing = await findOrganization(name, apiKey);
+  const foundByNameOnly = existing && !affinityOrgId && !domain;
   console.log(`[Affinity] upsertOrganization("${name}") → existing:`, existing ? `${existing.name}(${existing.id})` : 'not found in Affinity — skipping');
-  return existing ? { org: existing, created: false } : { org: null, created: false };
+  return existing ? { org: existing, created: false, foundByNameOnly } : { org: null, created: false };
 }
 
 // ── Persons ───────────────────────────────────────────────────────────────────

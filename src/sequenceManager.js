@@ -474,8 +474,8 @@ async function launchEmailOutreach({ companyData, ceoData, emailSequence, apiKey
         { name: orgName, domain: companyData.domain, affinityOrgId: cachedOrgId, ceoEmail: ceoData?.email, ceoFirstName: ceoData?.firstName, ceoLastName: ceoData?.lastName },
         affinityKey
       );
-      // Learn the mapping for next time
-      if (org && companyData?.domain) tracker.learnOrgId(companyData.domain, org.id);
+      // Only cache when found via reliable method (not name-only fallback which can return wrong org)
+      if (org && companyData?.domain && !created?.foundByNameOnly) tracker.learnOrgId(companyData.domain, org.id);
       if (!org) {
         console.log('[Affinity] org not found in Affinity — skipping sourcing list sync');
         results.affinity = { orgId: null, addedToList: false, chasingSet: false, notFound: true };
