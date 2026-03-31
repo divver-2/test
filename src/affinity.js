@@ -98,15 +98,22 @@ async function findOrganizationByDomain(domain, apiKey) {
 async function createOrganization({ name, domain }, apiKey) {
   const client = getClient(apiKey);
   const payload = { name };
-  if (domain) payload.domain_names = [domain];
+  if (domain) { payload.domain_names = [domain]; payload.domains = [domain]; }
   console.log('[Affinity] createOrganization payload:', JSON.stringify(payload));
   const res = await client.post('/organizations', payload);
-  // Affinity sometimes omits domain from the POST response — patch it in so downstream code can cache it
-  if (domain && res.data && !res.data.domain_names?.length) {
-    res.data.domain_names = [domain];
-    res.data.domains = [domain];
+  const org = res.data;
+  // If Affinity didn't store the domain, try a follow-up PUT to set it
+  if (domain && org?.id && !org.domain_names?.length && !org.domains?.length) {
+    try {
+      const update = await client.put(`/organizations/${org.id}`, { domain_names: [domain] });
+      console.log(`[Affinity] updated org domain: ${update.data?.domain_names || update.data?.domains}`);
+      Object.assign(org, update.data);
+    } catch (e) {
+      console.log('[Affinity] domain update error (non-fatal):', e.response?.status);
+    }
   }
-  return res.data;
+  if (domain) { org.domain_names = org.domain_names?.length ? org.domain_names : [domain]; org.domains = org.domains?.length ? org.domains : [domain]; }
+  return org;
 }
 
 
@@ -176,26 +183,35 @@ async function findOrganizationExhaustive(domain, name, apiKey) {
 async function findOrganizationV2ByDomain(domain, apiKey) {
   if (!domain) return null;
   const domainNorm = normalizeDomain(domain);
-
   const client = getClientV2(apiKey);
-  for (const params of [{ domain: domainNorm }, { term: domainNorm }]) {
+
+  // v2 GET /companies ignores domain/term filter params — it returns ALL companies paged
+  // Page through ALL v2 companies looking for a domain match (same logic as v1 exhaustive scan)
+  let cursor = null;
+  const MAX_PAGES = 50;
+  for (let page = 1; page <= MAX_PAGES; page++) {
     try {
-      const res = await client.get('/companies', { params: { ...params, page_size: 10 } });
-      const companies = res.data?.data || res.data?.companies || (Array.isArray(res.data) ? res.data : []);
-      console.log(`[Affinity v2] search(${JSON.stringify(params)}) → ${companies.length} results:`, companies.map(c => `${c.name}(${c.id})`));
+      const params = { limit: 100 };
+      if (cursor) params.cursor = cursor;
+      const res = await client.get('/companies', { params });
+      const companies = res.data?.data || (Array.isArray(res.data) ? res.data : []);
+      if (!companies.length) break;
       const match = companies.find(c => {
         const domains = c.domain_names || c.domains || (c.domain ? [c.domain] : []);
         return domains.some(d => normalizeDomain(d) === domainNorm);
       });
       if (match) {
-        console.log(`[Affinity v2] matched: ${match.name}(${match.id})`);
+        console.log(`[Affinity v2] found by domain scan p${page}: ${match.name}(${match.id})`);
         return { id: match.id, name: match.name, domain_names: match.domain_names || match.domains || [] };
       }
-      break; // got a valid response, no need to try term search
+      cursor = res.data?.pagination?.next_cursor || res.data?.next_cursor || null;
+      if (!cursor && companies.length < 100) break;
     } catch (e) {
-      console.log(`[Affinity v2] search error (${JSON.stringify(params)}):`, e.response?.status, JSON.stringify(e.response?.data));
+      console.log(`[Affinity v2] scan error p${page}:`, e.response?.status, JSON.stringify(e.response?.data));
+      break;
     }
   }
+  console.log(`[Affinity v2] domain scan complete — not found: ${domainNorm}`);
   return null;
 }
 
