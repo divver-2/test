@@ -119,11 +119,22 @@ async function findOrganizationExhaustive(domain, name, apiKey) {
   if (!domain && !name) return null;
   const client = getClient(apiKey);
   const domainNorm = domain ? normalizeDomain(domain) : null;
-  const nameLower = name ? name.toLowerCase() : null;
+  // Build multiple name variants to match against (Apollo adds "(YC S25)" etc that Affinity won't have)
+  const nameVariants = [];
+  if (name) {
+    const n = name.toLowerCase();
+    nameVariants.push(n);
+    // Strip parenthetical suffixes: "Alter (YC S25)" → "alter"
+    const stripped = n.replace(/\s*\(.*?\)\s*/g, '').trim();
+    if (stripped && stripped !== n) nameVariants.push(stripped);
+    // First word only: "alter"
+    const firstWord = n.split(/\s+/)[0];
+    if (firstWord && firstWord.length > 3 && !nameVariants.includes(firstWord)) nameVariants.push(firstWord);
+  }
   const MAX_PAGES = 100;
-  console.log(`[Affinity] exhaustive scan — domain:"${domain}" name:"${name}"...`);
-  let globalDomainFallback = null;
-  let workspaceNameMatch = null;
+  console.log(`[Affinity] exhaustive scan — domain:"${domain}" nameVariants:${JSON.stringify(nameVariants)}...`);
+  let workspaceMatch = null;
+  let globalMatch = null;
   for (let page = 1; page <= MAX_PAGES; page++) {
     try {
       const res = await client.get('/organizations', { params: { page_size: 100, page } });
@@ -131,25 +142,22 @@ async function findOrganizationExhaustive(domain, name, apiKey) {
       if (!orgs.length) break;
       for (const o of orgs) {
         const isGlobal = !!o.global;
-        // Domain match
+        const oNameLower = o.name?.toLowerCase() || '';
+        // Domain match — workspace wins immediately, global stored as fallback
         if (domainNorm) {
           const domains = o.domain_names || o.domains || [];
           const domainMatch = domains.some(d => normalizeDomain(d) === domainNorm) || normalizeDomain(o.domain) === domainNorm;
           if (domainMatch) {
             if (!isGlobal) { console.log(`[Affinity] exhaustive: workspace domain match "${o.name}"(${o.id})`); return o; }
-            if (!globalDomainFallback) globalDomainFallback = o;
+            if (!globalMatch) { globalMatch = o; console.log(`[Affinity] exhaustive: global domain match "${o.name}"(${o.id})`); }
           }
         }
-        // Name match — prefer workspace orgs, but accept global if nothing else found
-        if (nameLower && !workspaceNameMatch) {
-          if (o.name?.toLowerCase() === nameLower) {
-            if (!isGlobal) {
-              workspaceNameMatch = o;
-              console.log(`[Affinity] exhaustive: workspace name match "${o.name}"(${o.id})`);
-            } else if (!globalDomainFallback) {
-              globalDomainFallback = o; // use global name match as last resort
-              console.log(`[Affinity] exhaustive: global name match "${o.name}"(${o.id})`);
-            }
+        // Name match — exact or stripped variant
+        if (nameVariants.length && !workspaceMatch) {
+          const nameMatches = nameVariants.some(v => oNameLower === v || oNameLower.startsWith(v + ' ') || oNameLower.includes(v));
+          if (nameMatches) {
+            if (!isGlobal) { workspaceMatch = o; console.log(`[Affinity] exhaustive: workspace name match "${o.name}"(${o.id})`); }
+            else if (!globalMatch) { globalMatch = o; console.log(`[Affinity] exhaustive: global name match "${o.name}"(${o.id})`); }
           }
         }
       }
@@ -159,7 +167,7 @@ async function findOrganizationExhaustive(domain, name, apiKey) {
       break;
     }
   }
-  const result = globalDomainFallback || workspaceNameMatch || null;
+  const result = workspaceMatch || globalMatch || null;
   console.log(`[Affinity] exhaustive scan done → ${result ? `${result.name}(${result.id})` : 'not found'}`);
   return result;
 }
