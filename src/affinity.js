@@ -18,8 +18,8 @@ function getClient(apiKey) {
 function getClientV2(apiKey) {
   return axios.create({
     baseURL: 'https://api.affinity.co/v2',
-    // v2 uses Bearer token auth
-    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
+    auth: { username: '', password: apiKey },
+    headers: { 'Content-Type': 'application/json' },
   });
 }
 
@@ -157,39 +157,23 @@ async function findOrganizationV2ByDomain(domain, apiKey) {
   if (!domain) return null;
   const domainNorm = normalizeDomain(domain);
 
-  // Try both Bearer (v2 standard) and Basic auth (v1 style) — workspace may require either
-  const clients = [getClientV2(apiKey), getClient(apiKey).defaults ? null : null].filter(Boolean);
-  const bearerClient = getClientV2(apiKey);
-  const basicClient = axios.create({
-    baseURL: 'https://api.affinity.co/v2',
-    auth: { username: '', password: apiKey },
-    headers: { 'Content-Type': 'application/json' },
-  });
-
-  const paramVariants = [
-    { domain: domainNorm },
-    { term: domainNorm },
-  ];
-
-  for (const client of [bearerClient, basicClient]) {
-    for (const params of paramVariants) {
-      try {
-        const res = await client.get('/companies', { params: { ...params, page_size: 10 } });
-        const companies = res.data?.data || res.data?.companies || (Array.isArray(res.data) ? res.data : []);
-        console.log(`[Affinity v2] search(${JSON.stringify(params)}) → ${companies.length} results:`, companies.map(c => `${c.name}(${c.id})`));
-        const match = companies.find(c => {
-          const domains = c.domain_names || c.domains || (c.domain ? [c.domain] : []);
-          return domains.some(d => normalizeDomain(d) === domainNorm);
-        });
-        if (match) {
-          console.log(`[Affinity v2] matched: ${match.name}(${match.id})`);
-          return { id: match.id, name: match.name, domain_names: match.domain_names || match.domains || [] };
-        }
-        // If we got a valid response (even empty), no need to try basic auth for same params
-        break;
-      } catch (e) {
-        console.log(`[Affinity v2] search error (${JSON.stringify(params)}):`, e.response?.status, JSON.stringify(e.response?.data));
+  const client = getClientV2(apiKey);
+  for (const params of [{ domain: domainNorm }, { term: domainNorm }]) {
+    try {
+      const res = await client.get('/companies', { params: { ...params, page_size: 10 } });
+      const companies = res.data?.data || res.data?.companies || (Array.isArray(res.data) ? res.data : []);
+      console.log(`[Affinity v2] search(${JSON.stringify(params)}) → ${companies.length} results:`, companies.map(c => `${c.name}(${c.id})`));
+      const match = companies.find(c => {
+        const domains = c.domain_names || c.domains || (c.domain ? [c.domain] : []);
+        return domains.some(d => normalizeDomain(d) === domainNorm);
+      });
+      if (match) {
+        console.log(`[Affinity v2] matched: ${match.name}(${match.id})`);
+        return { id: match.id, name: match.name, domain_names: match.domain_names || match.domains || [] };
       }
+      break; // got a valid response, no need to try term search
+    } catch (e) {
+      console.log(`[Affinity v2] search error (${JSON.stringify(params)}):`, e.response?.status, JSON.stringify(e.response?.data));
     }
   }
   return null;
