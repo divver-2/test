@@ -25,6 +25,29 @@ function getClientV2(apiKey) {
 
 // ── Organizations ─────────────────────────────────────────────────────────────
 
+// Single-page name search — fast, used for read-only lookups where speed matters
+async function findOrganizationFast(name, apiKey) {
+  if (!name) return null;
+  const client = getClient(apiKey);
+  const nameLower = name.toLowerCase();
+  try {
+    const res = await client.get('/organizations', { params: { term: name, page_size: 100, with_interaction_dates: true } });
+    const orgs = res.data?.organizations || (Array.isArray(res.data) ? res.data : []);
+    const matches = orgs.filter(o => o.name?.toLowerCase() === nameLower);
+    if (matches.length) {
+      return (
+        matches.find(o => !o.global && (o.interaction_dates?.last_email_date || o.interaction_dates?.last_interaction_date)) ||
+        matches.find(o => !o.global) ||
+        matches[0]
+      );
+    }
+    return orgs[0] || null;
+  } catch (e) {
+    console.log('[Affinity] findOrganizationFast error:', e.response?.status, e.message);
+    return null;
+  }
+}
+
 async function findOrganization(name, apiKey) {
   const client = getClient(apiKey);
   const nameLower = name.toLowerCase();
@@ -629,11 +652,13 @@ async function setGlobalOwner(orgId, ownerName, apiKey) {
 async function lookupCompanyInAffinity(companyName, apiKey, domain, ceoEmail) {
   const client = getClient(apiKey);
 
-  // Try by name, then domain search, then exhaustive scan
-  let org = await findOrganization(companyName, apiKey);
-  if (!org && domain) org = await findOrganizationByDomain(domain, apiKey);
-  if (!org) org = await findOrganization(domain || companyName, apiKey);
-  if (!org && (domain || companyName)) org = await findOrganizationExhaustive(domain, companyName, apiKey);
+  // Run all fast searches in parallel — skip exhaustive scan here (read-only lookup, speed matters)
+  const [nameResult, domainResult, ceoEmailResult] = await Promise.all([
+    companyName ? findOrganizationFast(companyName, apiKey) : Promise.resolve(null),
+    domain ? findOrganizationByDomain(domain, apiKey) : Promise.resolve(null),
+    ceoEmail ? findOrganizationByCeoEmail(ceoEmail, apiKey) : Promise.resolve(null),
+  ]);
+  let org = nameResult || domainResult || ceoEmailResult;
   if (!org) return null;
 
   const result = {
