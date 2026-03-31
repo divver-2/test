@@ -223,24 +223,19 @@ async function upsertOrganization({ name, domain, affinityOrgId, ceoEmail, ceoFi
     const org = await getOrganizationById(affinityOrgId, apiKey);
     if (org) { console.log(`[Affinity] using manual org ID ${affinityOrgId} → ${org.name}`); return { org, created: false }; }
   }
-  // When a domain is available, trust domain-based searches over name searches.
-  // Name searches (e.g. "Diligent") can return the wrong company.
-  let existing = null;
-  if (domain) {
-    // 1. v2 domain search
-    existing = await findOrganizationV2ByDomain(domain, apiKey);
-    // 2. v1 domain_name parameter search
-    if (!existing) existing = await findOrganizationByDomain(domain, apiKey);
-  }
-  // 3. CEO email → find person in Affinity → get their org
-  if (!existing && ceoEmail) existing = await findOrganizationByCeoEmail(ceoEmail, apiKey);
-  // 3b. CEO name → find person in Affinity → get their org
-  if (!existing && (ceoFirstName || ceoLastName)) existing = await findOrganizationByCeoName(ceoFirstName, ceoLastName, apiKey);
-  // 4. Exhaustive scan — matches by domain AND name, prefers workspace orgs over global
+  // 1. Run all fast searches in parallel
+  const [v2Result, v1Result, emailResult, nameResult] = await Promise.all([
+    domain ? findOrganizationV2ByDomain(domain, apiKey) : Promise.resolve(null),
+    domain ? findOrganizationByDomain(domain, apiKey) : Promise.resolve(null),
+    ceoEmail ? findOrganizationByCeoEmail(ceoEmail, apiKey) : Promise.resolve(null),
+    (ceoFirstName || ceoLastName) ? findOrganizationByCeoName(ceoFirstName, ceoLastName, apiKey) : Promise.resolve(null),
+  ]);
+  let existing = v2Result || v1Result || emailResult || nameResult;
+  // 2. Exhaustive scan only if all fast searches failed (slow — last resort)
   if (!existing) existing = await findOrganizationExhaustive(domain, name, apiKey);
-  // 5. Name search only as absolute last resort
+  // 3. Name search as absolute last resort
   if (!existing) existing = await findOrganization(name, apiKey);
-  const foundByNameOnly = existing && !affinityOrgId && !domain;
+  const foundByNameOnly = !!(existing && !affinityOrgId && !v2Result && !v1Result && !emailResult && !nameResult && !domain);
   console.log(`[Affinity] upsertOrganization("${name}") → existing:`, existing ? `${existing.name}(${existing.id})` : 'not found in Affinity — skipping');
   return existing ? { org: existing, created: false, foundByNameOnly } : { org: null, created: false };
 }
