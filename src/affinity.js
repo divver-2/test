@@ -179,39 +179,10 @@ async function findOrganizationExhaustive(domain, name, apiKey) {
   return result;
 }
 
-// Search Affinity v2 API for a company by domain — finds network/shared orgs that v1 search misses
+// Search Affinity v2 API for a company by domain
+// NOTE: v2 GET /companies does not support filtering — this is a no-op placeholder
+// Domain-based lookup relies on v1 findOrganizationByDomain (requires domain stored on the org in Affinity)
 async function findOrganizationV2ByDomain(domain, apiKey) {
-  if (!domain) return null;
-  const domainNorm = normalizeDomain(domain);
-  const client = getClientV2(apiKey);
-
-  // v2 GET /companies ignores domain/term filter params — it returns ALL companies paged
-  // Page through ALL v2 companies looking for a domain match (same logic as v1 exhaustive scan)
-  let cursor = null;
-  const MAX_PAGES = 50;
-  for (let page = 1; page <= MAX_PAGES; page++) {
-    try {
-      const params = { limit: 100 };
-      if (cursor) params.cursor = cursor;
-      const res = await client.get('/companies', { params });
-      const companies = res.data?.data || (Array.isArray(res.data) ? res.data : []);
-      if (!companies.length) break;
-      const match = companies.find(c => {
-        const domains = c.domain_names || c.domains || (c.domain ? [c.domain] : []);
-        return domains.some(d => normalizeDomain(d) === domainNorm);
-      });
-      if (match) {
-        console.log(`[Affinity v2] found by domain scan p${page}: ${match.name}(${match.id})`);
-        return { id: match.id, name: match.name, domain_names: match.domain_names || match.domains || [] };
-      }
-      cursor = res.data?.pagination?.next_cursor || res.data?.next_cursor || null;
-      if (!cursor && companies.length < 100) break;
-    } catch (e) {
-      console.log(`[Affinity v2] scan error p${page}:`, e.response?.status, JSON.stringify(e.response?.data));
-      break;
-    }
-  }
-  console.log(`[Affinity v2] domain scan complete — not found: ${domainNorm}`);
   return null;
 }
 
