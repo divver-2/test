@@ -98,7 +98,13 @@ async function createOrganization({ name, domain }, apiKey) {
   const client = getClient(apiKey);
   const payload = { name };
   if (domain) payload.domain_names = [domain];
+  console.log('[Affinity] createOrganization payload:', JSON.stringify(payload));
   const res = await client.post('/organizations', payload);
+  // Affinity sometimes omits domain from the POST response — patch it in so downstream code can cache it
+  if (domain && res.data && !res.data.domain_names?.length) {
+    res.data.domain_names = [domain];
+    res.data.domains = [domain];
+  }
   return res.data;
 }
 
