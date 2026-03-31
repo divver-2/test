@@ -469,7 +469,7 @@ async function launchEmailOutreach({ companyData, ceoData, emailSequence, apiKey
     try {
       const orgName = companyData.name || companyData.domain;
       const { org, created } = await affinity.upsertOrganization(
-        { name: orgName, domain: companyData.domain, affinityOrgId: companyData?.affinityOrgId, ceoEmail: ceoData?.email },
+        { name: orgName, domain: companyData.domain, affinityOrgId: companyData?.affinityOrgId, ceoEmail: ceoData?.email, ceoFirstName: ceoData?.firstName, ceoLastName: ceoData?.lastName },
         affinityKey
       );
       if (!org) {

@@ -172,7 +172,34 @@ async function findOrganizationByCeoEmail(ceoEmail, apiKey) {
   }
 }
 
-// Get an org directly by Affinity org ID (manual override)
+// Search Affinity for a person by name, then return their linked org
+async function findOrganizationByCeoName(firstName, lastName, apiKey) {
+  if (!firstName && !lastName) return null;
+  const client = getClient(apiKey);
+  const term = `${firstName || ''} ${lastName || ''}`.trim();
+  try {
+    const res = await client.get('/persons', { params: { term, page_size: 10 } });
+    const people = res.data?.persons || (Array.isArray(res.data) ? res.data : []);
+    const fLower = (firstName || '').toLowerCase();
+    const lLower = (lastName || '').toLowerCase();
+    for (const person of people) {
+      const pFirst = (person.first_name || '').toLowerCase();
+      const pLast = (person.last_name || '').toLowerCase();
+      if (pFirst !== fLower || pLast !== lLower) continue;
+      const orgId = person.organization_ids?.[0];
+      if (!orgId) continue;
+      const orgRes = await client.get(`/organizations/${orgId}`);
+      const org = orgRes.data;
+      console.log(`[Affinity] findOrgByCeoName("${term}") → found org: ${org?.name}(${org?.id})`);
+      return org;
+    }
+    console.log(`[Affinity] findOrgByCeoName("${term}") → no match`);
+    return null;
+  } catch (e) {
+    console.log('[Affinity] findOrgByCeoName error:', e.response?.status, e.message);
+    return null;
+  }
+}
 async function getOrganizationById(orgId, apiKey) {
   if (!orgId) return null;
   try {
@@ -184,7 +211,7 @@ async function getOrganizationById(orgId, apiKey) {
   }
 }
 
-async function upsertOrganization({ name, domain, affinityOrgId, ceoEmail }, apiKey) {
+async function upsertOrganization({ name, domain, affinityOrgId, ceoEmail, ceoFirstName, ceoLastName }, apiKey) {
   // 0. Manual Affinity org ID override
   if (affinityOrgId) {
     const org = await getOrganizationById(affinityOrgId, apiKey);
@@ -201,6 +228,8 @@ async function upsertOrganization({ name, domain, affinityOrgId, ceoEmail }, api
   }
   // 3. CEO email → find person in Affinity → get their org
   if (!existing && ceoEmail) existing = await findOrganizationByCeoEmail(ceoEmail, apiKey);
+  // 3b. CEO name → find person in Affinity → get their org
+  if (!existing && (ceoFirstName || ceoLastName)) existing = await findOrganizationByCeoName(ceoFirstName, ceoLastName, apiKey);
   // 4. Exhaustive scan — matches by domain AND name, prefers workspace orgs over global
   if (!existing) existing = await findOrganizationExhaustive(domain, name, apiKey);
   // 5. Name search only as absolute last resort
