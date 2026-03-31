@@ -405,6 +405,7 @@
         <input type="text" id="companyInput" placeholder="e.g. stripe.com, hubspot.com…" autocomplete="off" />
       </div>
       <button class="btn btn-primary" id="addBtn" onclick="addCompany()">Look Up</button>
+      <button class="btn" onclick="clearDomainCache()" title="Clear cached Affinity org ID for this domain" style="padding:8px 14px;font-size:0.8rem;color:var(--muted)">Clear Cache</button>
     </div>
   </div>
 
@@ -654,6 +655,16 @@ function updatePill(hasKey) {
 
 // Init pill on load
 updatePill(!!getApiKey());
+
+// ── Clear cached Affinity org ID for current domain ──────
+async function clearDomainCache() {
+  const domain = document.getElementById('companyInput').value.trim();
+  if (!domain) { alert('Enter a domain first'); return; }
+  const res = await fetch('/api/cache/clear', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ domain }) });
+  const data = await res.json();
+  if (data.ok) setStatus(`Cache cleared for ${data.cleared} — look up again to re-fetch`, 'success');
+  else setStatus('Clear failed: ' + (data.error || 'unknown'), 'error');
+}
 
 // ── Copy email to clipboard ───────────────────────────────
 function copyEmail() {

@@ -333,6 +333,21 @@ app.post('/api/webhooks/apollo', async (req, res) => {
 // Health check
 app.get('/api/health', (_, res) => res.json({ ok: true }));
 
+// Clear cached org ID for a domain (use when Affinity org was deleted/changed)
+app.post('/api/cache/clear', (req, res) => {
+  const { domain } = req.body;
+  if (!domain) return res.status(400).json({ error: 'domain required' });
+  const tracker = require('./src/outreachTracker');
+  const fs = require('fs'), path = require('path');
+  const file = path.join(__dirname, 'data/outreach-tracker.json');
+  try {
+    const data = fs.existsSync(file) ? JSON.parse(fs.readFileSync(file, 'utf8')) : {};
+    const key = domain.toLowerCase();
+    if (data[key]) { delete data[key]; fs.writeFileSync(file, JSON.stringify(data, null, 2)); }
+    res.json({ ok: true, cleared: key });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   console.log(`\nCEO Outreach Tool running at http://localhost:${PORT}\n`);
