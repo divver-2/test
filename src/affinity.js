@@ -18,8 +18,8 @@ function getClient(apiKey) {
 function getClientV2(apiKey) {
   return axios.create({
     baseURL: 'https://api.affinity.co/v2',
-    auth: { username: '', password: apiKey },
-    headers: { 'Content-Type': 'application/json' },
+    // v2 uses Bearer token auth
+    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
   });
 }
 
@@ -155,24 +155,33 @@ async function findOrganizationExhaustive(domain, name, apiKey) {
 // Search Affinity v2 API for a company by domain — finds network/shared orgs that v1 search misses
 async function findOrganizationV2ByDomain(domain, apiKey) {
   if (!domain) return null;
-  try {
-    const client = getClientV2(apiKey);
-    const res = await client.get('/companies', { params: { term: domain, page_size: 10 } });
-    const companies = res.data?.data || res.data?.companies || (Array.isArray(res.data) ? res.data : []);
-    console.log(`[Affinity v2] search("${domain}") → ${companies.length} results:`, companies.map(c => `${c.name}(${c.id})`));
-    const domainLower = domain.toLowerCase();
-    const match = companies.find(c => {
-      const domains = c.domain_names || c.domains || (c.domain ? [c.domain] : []);
-      return domains.some(d => d.toLowerCase() === domainLower);
-    });
-    if (match) {
-      return { id: match.id, name: match.name, domain_names: match.domain_names || match.domains || [] };
+  const domainNorm = normalizeDomain(domain);
+  const client = getClientV2(apiKey);
+
+  // Try domain-specific filter first (most precise), then fall back to term search
+  const attempts = [
+    () => client.get('/companies', { params: { domain: domainNorm, pageSize: 10 } }),
+    () => client.get('/companies', { params: { term: domainNorm, pageSize: 10 } }),
+  ];
+
+  for (const attempt of attempts) {
+    try {
+      const res = await attempt();
+      const companies = res.data?.data || res.data?.companies || (Array.isArray(res.data) ? res.data : []);
+      console.log(`[Affinity v2] search("${domainNorm}") → ${companies.length} results:`, companies.map(c => `${c.name}(${c.id})`));
+      const match = companies.find(c => {
+        const domains = c.domain_names || c.domains || (c.domain ? [c.domain] : []);
+        return domains.some(d => normalizeDomain(d) === domainNorm);
+      });
+      if (match) {
+        console.log(`[Affinity v2] matched: ${match.name}(${match.id})`);
+        return { id: match.id, name: match.name, domain_names: match.domain_names || match.domains || [] };
+      }
+    } catch (e) {
+      console.log('[Affinity v2] search error:', e.response?.status, JSON.stringify(e.response?.data));
     }
-    return null;
-  } catch (e) {
-    console.log('[Affinity v2] search error:', e.response?.status, JSON.stringify(e.response?.data));
-    return null;
   }
+  return null;
 }
 
 // Search by CEO email — find the person in Affinity, then get their org
@@ -653,12 +662,13 @@ async function lookupCompanyInAffinity(companyName, apiKey, domain, ceoEmail) {
   const client = getClient(apiKey);
 
   // Run all fast searches in parallel — skip exhaustive scan here (read-only lookup, speed matters)
-  const [nameResult, domainResult, ceoEmailResult] = await Promise.all([
+  const [nameResult, domainResult, v2Result, ceoEmailResult] = await Promise.all([
     companyName ? findOrganizationFast(companyName, apiKey) : Promise.resolve(null),
     domain ? findOrganizationByDomain(domain, apiKey) : Promise.resolve(null),
+    domain ? findOrganizationV2ByDomain(domain, apiKey) : Promise.resolve(null),
     ceoEmail ? findOrganizationByCeoEmail(ceoEmail, apiKey) : Promise.resolve(null),
   ]);
-  let org = nameResult || domainResult || ceoEmailResult;
+  let org = nameResult || domainResult || v2Result || ceoEmailResult;
   if (!org) return null;
 
   const result = {
