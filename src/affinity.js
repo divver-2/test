@@ -121,6 +121,37 @@ function normalizeDomain(d) {
   return (d || '').toLowerCase().replace(/^www\./, '');
 }
 
+// Search by domain name as a text term — finds global/Crunchbase orgs that domain-filter misses.
+// E.g. for "alterai.dev" → search term="alterai", then verify domain in results.
+async function findOrganizationByDomainTerm(domain, apiKey) {
+  if (!domain) return null;
+  const domainNorm = normalizeDomain(domain);
+  const client = getClient(apiKey);
+  // Try multiple search terms: full domain, domain without TLD, domain first segment
+  const terms = [];
+  terms.push(domainNorm); // e.g. "alterai.dev"
+  const withoutTLD = domainNorm.replace(/\.[^.]+$/, ''); // e.g. "alterai"
+  if (withoutTLD && withoutTLD !== domainNorm) terms.push(withoutTLD);
+  for (const term of terms) {
+    try {
+      const res = await client.get('/organizations', { params: { term, page_size: 100, with_interaction_dates: true } });
+      const orgs = res.data?.organizations || (Array.isArray(res.data) ? res.data : []);
+      const match = orgs.find(o => {
+        const domains = o.domain_names || o.domains || [];
+        return domains.some(d => normalizeDomain(d) === domainNorm) || normalizeDomain(o.domain) === domainNorm;
+      });
+      if (match) {
+        console.log(`[Affinity] findOrganizationByDomainTerm("${term}") → matched: ${match.name}(${match.id}) global:${!!match.global}`);
+        return match;
+      }
+      console.log(`[Affinity] findOrganizationByDomainTerm("${term}") → ${orgs.length} results, no domain match`);
+    } catch (e) {
+      console.log('[Affinity] findOrganizationByDomainTerm error:', e.response?.status, e.message);
+    }
+  }
+  return null;
+}
+
 // Exhaustive scan through ALL organizations — matches by domain OR name, prefers workspace (non-global) orgs
 async function findOrganizationExhaustive(domain, name, apiKey) {
   if (!domain && !name) return null;
@@ -284,18 +315,19 @@ async function upsertOrganization({ name, domain, affinityOrgId, ceoEmail, ceoFi
     if (org) { console.log(`[Affinity] using manual org ID ${affinityOrgId} → ${org.name}`); return { org, created: false }; }
   }
   // 1. Run all fast searches in parallel
-  const [v2Result, v1Result, emailResult, nameResult] = await Promise.all([
+  const [v2Result, v1Result, domainTermResult, emailResult, nameResult] = await Promise.all([
     cleanDomain ? findOrganizationV2ByDomain(cleanDomain, apiKey) : Promise.resolve(null),
     cleanDomain ? findOrganizationByDomain(cleanDomain, apiKey) : Promise.resolve(null),
+    cleanDomain ? findOrganizationByDomainTerm(cleanDomain, apiKey) : Promise.resolve(null),
     ceoEmail ? findOrganizationByCeoEmail(ceoEmail, apiKey) : Promise.resolve(null),
     (ceoFirstName || ceoLastName) ? findOrganizationByCeoName(ceoFirstName, ceoLastName, apiKey) : Promise.resolve(null),
   ]);
-  let existing = v2Result || v1Result || emailResult || nameResult;
+  let existing = v2Result || v1Result || domainTermResult || emailResult || nameResult;
   // 2. Exhaustive scan only if all fast searches failed (slow — last resort)
   if (!existing) existing = await findOrganizationExhaustive(cleanDomain, name, apiKey);
   // 3. Name search only if no domain — avoid matching wrong company by name when domain didn't match
   if (!existing && !cleanDomain) existing = await findOrganization(name, apiKey);
-  const foundByNameOnly = !!(existing && !affinityOrgId && !v2Result && !v1Result && !emailResult && !nameResult && !cleanDomain);
+  const foundByNameOnly = !!(existing && !affinityOrgId && !v2Result && !v1Result && !domainTermResult && !emailResult && !nameResult && !cleanDomain);
   if (existing) {
     console.log(`[Affinity] upsertOrganization("${name}") → found: ${existing.name}(${existing.id})`);
     return { org: existing, created: false, foundByNameOnly };
@@ -703,13 +735,14 @@ async function lookupCompanyInAffinity(companyName, apiKey, domain, ceoEmail) {
   const cleanDomain = domain ? normalizeDomain(domain) : null;
 
   // Run all fast searches in parallel — skip exhaustive scan here (read-only lookup, speed matters)
-  const [nameResult, domainResult, v2Result, ceoEmailResult] = await Promise.all([
+  const [nameResult, domainResult, v2Result, domainTermResult, ceoEmailResult] = await Promise.all([
     companyName ? findOrganizationFast(companyName, apiKey) : Promise.resolve(null),
     cleanDomain ? findOrganizationByDomain(cleanDomain, apiKey) : Promise.resolve(null),
     cleanDomain ? findOrganizationV2ByDomain(cleanDomain, apiKey) : Promise.resolve(null),
+    cleanDomain ? findOrganizationByDomainTerm(cleanDomain, apiKey) : Promise.resolve(null),
     ceoEmail ? findOrganizationByCeoEmail(ceoEmail, apiKey) : Promise.resolve(null),
   ]);
-  let org = nameResult || domainResult || v2Result || ceoEmailResult;
+  let org = nameResult || domainResult || v2Result || domainTermResult || ceoEmailResult;
   if (!org) return null;
 
   const result = {

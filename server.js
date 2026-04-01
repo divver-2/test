@@ -330,6 +330,15 @@ app.post('/api/webhooks/apollo', async (req, res) => {
   }
 });
 
+// Manually set Affinity org ID for a domain — saves to cache so future lookups skip searching
+app.post('/api/affinity/set-org-id', (req, res) => {
+  const { domain, orgId } = req.body;
+  if (!domain || !orgId) return res.status(400).json({ error: 'domain and orgId are required' });
+  const cleanDomain = domain.toLowerCase().replace(/^www\./, '');
+  tracker.learnOrgId(cleanDomain, orgId);
+  res.json({ ok: true, domain: cleanDomain, orgId });
+});
+
 // CEO override — look up the correct CEO by LinkedIn URL and regenerate the email draft
 app.post('/api/ceo-override', async (req, res) => {
   const { linkedinUrl, domain, companyName, industry, description, apiKey: bodyKey } = req.body;
