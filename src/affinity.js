@@ -179,10 +179,33 @@ async function findOrganizationExhaustive(domain, name, apiKey) {
   return result;
 }
 
-// Search Affinity v2 API for a company by domain
-// NOTE: v2 GET /companies does not support filtering — this is a no-op placeholder
-// Domain-based lookup relies on v1 findOrganizationByDomain (requires domain stored on the org in Affinity)
+// Search Affinity v2 API for a company by domain — finds global/network orgs invisible to v1
 async function findOrganizationV2ByDomain(domain, apiKey) {
+  if (!domain) return null;
+  const domainNorm = normalizeDomain(domain);
+  const client = getClientV2(apiKey);
+  // Use pageSize (camelCase) — this is what worked to find Diligent
+  for (const params of [
+    { domain: domainNorm, pageSize: 100 },
+    { term: domainNorm, pageSize: 100 },
+  ]) {
+    try {
+      const res = await client.get('/companies', { params });
+      const companies = res.data?.data || res.data?.companies || (Array.isArray(res.data) ? res.data : []);
+      console.log(`[Affinity v2] search(${JSON.stringify(params)}) → ${companies.length} results`);
+      const match = companies.find(c => {
+        const domains = c.domain_names || c.domains || (c.domain ? [c.domain] : []);
+        return domains.some(d => normalizeDomain(d) === domainNorm);
+      });
+      if (match) {
+        console.log(`[Affinity v2] matched: ${match.name}(${match.id})`);
+        return { id: match.id, name: match.name, domain_names: match.domain_names || match.domains || [] };
+      }
+    } catch (e) {
+      console.log(`[Affinity v2] error (${JSON.stringify(params)}):`, e.response?.status, JSON.stringify(e.response?.data)?.slice(0, 100));
+    }
+  }
+  console.log(`[Affinity v2] not found: ${domainNorm}`);
   return null;
 }
 
