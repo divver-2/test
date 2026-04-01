@@ -275,6 +275,9 @@ async function getOrganizationById(orgId, apiKey) {
 }
 
 async function upsertOrganization({ name, domain, affinityOrgId, ceoEmail, ceoFirstName, ceoLastName }, apiKey) {
+  // Always normalize domain (strip www.) before any lookup or caching
+  const cleanDomain = domain ? normalizeDomain(domain) : null;
+
   // 0. Manual Affinity org ID override
   if (affinityOrgId) {
     const org = await getOrganizationById(affinityOrgId, apiKey);
@@ -282,17 +285,17 @@ async function upsertOrganization({ name, domain, affinityOrgId, ceoEmail, ceoFi
   }
   // 1. Run all fast searches in parallel
   const [v2Result, v1Result, emailResult, nameResult] = await Promise.all([
-    domain ? findOrganizationV2ByDomain(domain, apiKey) : Promise.resolve(null),
-    domain ? findOrganizationByDomain(domain, apiKey) : Promise.resolve(null),
+    cleanDomain ? findOrganizationV2ByDomain(cleanDomain, apiKey) : Promise.resolve(null),
+    cleanDomain ? findOrganizationByDomain(cleanDomain, apiKey) : Promise.resolve(null),
     ceoEmail ? findOrganizationByCeoEmail(ceoEmail, apiKey) : Promise.resolve(null),
     (ceoFirstName || ceoLastName) ? findOrganizationByCeoName(ceoFirstName, ceoLastName, apiKey) : Promise.resolve(null),
   ]);
   let existing = v2Result || v1Result || emailResult || nameResult;
   // 2. Exhaustive scan only if all fast searches failed (slow — last resort)
-  if (!existing) existing = await findOrganizationExhaustive(domain, name, apiKey);
-  // 3. Name search as absolute last resort
-  if (!existing) existing = await findOrganization(name, apiKey);
-  const foundByNameOnly = !!(existing && !affinityOrgId && !v2Result && !v1Result && !emailResult && !nameResult && !domain);
+  if (!existing) existing = await findOrganizationExhaustive(cleanDomain, name, apiKey);
+  // 3. Name search only if no domain — avoid matching wrong company by name when domain didn't match
+  if (!existing && !cleanDomain) existing = await findOrganization(name, apiKey);
+  const foundByNameOnly = !!(existing && !affinityOrgId && !v2Result && !v1Result && !emailResult && !nameResult && !cleanDomain);
   if (existing) {
     console.log(`[Affinity] upsertOrganization("${name}") → found: ${existing.name}(${existing.id})`);
     return { org: existing, created: false, foundByNameOnly };
@@ -300,7 +303,7 @@ async function upsertOrganization({ name, domain, affinityOrgId, ceoEmail, ceoFi
   // Not found — create it so it gets added to the sourcing list
   console.log(`[Affinity] upsertOrganization("${name}") → not found, creating new org`);
   try {
-    const created = await createOrganization({ name, domain }, apiKey);
+    const created = await createOrganization({ name, domain: cleanDomain }, apiKey);
     console.log(`[Affinity] created new org: ${created.name}(${created.id})`);
     return { org: created, created: true };
   } catch (e) {
@@ -697,12 +700,13 @@ async function setGlobalOwner(orgId, ownerName, apiKey) {
 
 async function lookupCompanyInAffinity(companyName, apiKey, domain, ceoEmail) {
   const client = getClient(apiKey);
+  const cleanDomain = domain ? normalizeDomain(domain) : null;
 
   // Run all fast searches in parallel — skip exhaustive scan here (read-only lookup, speed matters)
   const [nameResult, domainResult, v2Result, ceoEmailResult] = await Promise.all([
     companyName ? findOrganizationFast(companyName, apiKey) : Promise.resolve(null),
-    domain ? findOrganizationByDomain(domain, apiKey) : Promise.resolve(null),
-    domain ? findOrganizationV2ByDomain(domain, apiKey) : Promise.resolve(null),
+    cleanDomain ? findOrganizationByDomain(cleanDomain, apiKey) : Promise.resolve(null),
+    cleanDomain ? findOrganizationV2ByDomain(cleanDomain, apiKey) : Promise.resolve(null),
     ceoEmail ? findOrganizationByCeoEmail(ceoEmail, apiKey) : Promise.resolve(null),
   ]);
   let org = nameResult || domainResult || v2Result || ceoEmailResult;
