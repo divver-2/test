@@ -475,12 +475,6 @@
     <!-- Footer -->
     <div class="result-footer" id="resultFooter"></div>
 
-    <!-- Affinity ID override -->
-    <div id="affinityOverrideRow" style="padding:0 24px 14px;display:flex;gap:7px;align-items:center">
-      <input type="text" id="affinityOrgIdInput" style="flex:1;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:8px 12px;color:var(--text);font-size:0.82rem;outline:none;min-width:0" placeholder="Wrong Affinity match? Paste org ID to fix…" onkeydown="if(event.key==='Enter')setAffinityOrgId()" />
-      <button onclick="setAffinityOrgId()" style="padding:8px 14px;border-radius:8px;cursor:pointer;font-size:0.82rem;font-weight:600;white-space:nowrap;background:var(--surface2);border:1px solid var(--border);color:#fff;transition:all 0.15s" id="setAffinityBtn">Set ID</button>
-    </div>
-
     <!-- Send status -->
     <div id="sendStatus" style="padding:14px 0 0"></div>
 
@@ -706,35 +700,6 @@ function copyEmail() {
     btn.textContent = 'Copied!';
     setTimeout(() => btn.textContent = 'Copy Email', 2000);
   });
-}
-
-// ── Manually set Affinity org ID ─────────────────────────
-async function setAffinityOrgId() {
-  if (!currentResult) return;
-  const orgId = document.getElementById('affinityOrgIdInput').value.trim();
-  if (!orgId) { document.getElementById('affinityOrgIdInput').focus(); return; }
-  const domain = currentResult.company?.domain;
-  if (!domain) { setStatus('No domain on current result', 'error'); return; }
-
-  const btn = document.getElementById('setAffinityBtn');
-  btn.disabled = true; btn.textContent = 'Saving…';
-  try {
-    const res = await fetch('/api/affinity/set-org-id', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ domain, orgId }),
-    });
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.error || 'Failed');
-    currentResult.affinity = { ...currentResult.affinity, inAffinity: true, orgId };
-    document.getElementById('affinityOrgIdInput').value = '';
-    setStatus(`Affinity ID saved for ${esc(domain)} — will use org ${esc(orgId)} next time`, 'loading');
-    setTimeout(clearStatus, 3000);
-  } catch(e) {
-    setStatus('Failed to set Affinity ID: ' + e.message, 'error');
-  } finally {
-    btn.disabled = false; btn.textContent = 'Set ID';
-  }
 }
 
 // ── Override CEO via LinkedIn URL ────────────────────────
