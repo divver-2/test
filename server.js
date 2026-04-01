@@ -330,6 +330,56 @@ app.post('/api/webhooks/apollo', async (req, res) => {
   }
 });
 
+// CEO override — look up the correct CEO by LinkedIn URL and regenerate the email draft
+app.post('/api/ceo-override', async (req, res) => {
+  const { linkedinUrl, domain, companyName, industry, description, apiKey: bodyKey } = req.body;
+  if (!linkedinUrl) return res.status(400).json({ error: 'linkedinUrl is required' });
+
+  const apiKey = bodyKey || process.env.APOLLO_API_KEY;
+  if (!apiKey) return res.status(400).json({ error: 'Apollo API key is required' });
+
+  try {
+    const person = await apollo.matchPersonByLinkedIn(linkedinUrl, apiKey);
+    if (!person) return res.status(404).json({ error: 'Person not found in Apollo for that LinkedIn URL' });
+
+    const ceoName = `${person.first_name || ''} ${person.last_name || ''}`.trim();
+    const ceoEmail =
+      person.email ||
+      person.work_email ||
+      person.personal_emails?.[0] ||
+      person.contact_emails?.[0]?.email ||
+      null;
+
+    const { buildEmailSequence } = require('./src/emailGenerator');
+    const emailSequence = await buildEmailSequence({
+      ceoName,
+      companyName: companyName || domain || '',
+      industry: industry || '',
+      description: description || '',
+      website: domain ? `https://${domain}` : null,
+      senderName: 'David Divver',
+    });
+
+    res.json({
+      ceo: {
+        name: ceoName,
+        email: ceoEmail,
+        title: person.title || null,
+        emailVerified: person.email_status === 'verified',
+        linkedinUrl: person.linkedin_url || linkedinUrl,
+        firstName: person.first_name || null,
+        lastName: person.last_name || null,
+        apolloId: person.id || null,
+      },
+      emailDraft: emailSequence[0] || null,
+      emailSequence,
+    });
+  } catch (err) {
+    console.error('[/api/ceo-override] Error:', err.response?.data || err.message);
+    res.status(500).json({ error: err.response?.data?.message || err.message });
+  }
+});
+
 // Health check
 app.get('/api/health', (_, res) => res.json({ ok: true }));
 

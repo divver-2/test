@@ -287,6 +287,16 @@ async function enrichPersonByNameAndDomain(firstName, lastName, domain, apiKey, 
   return res.data.person || null;
 }
 
+// Look up a person by LinkedIn URL — used when Apollo returns the wrong CEO
+async function matchPersonByLinkedIn(linkedinUrl, apiKey) {
+  const res = await axios.post(
+    `${APOLLO_BASE}/people/match`,
+    { linkedin_url: linkedinUrl, reveal_personal_emails: true, reveal_phone_number: false },
+    { headers: getHeaders(apiKey) }
+  );
+  return res.data.person || null;
+}
+
 // Get connected email accounts in Apollo
 async function getEmailAccounts(apiKey) {
   const res = await axios.get(
@@ -410,4 +420,5 @@ module.exports = {
   getCompanyEmailActivity,
   getSequenceContacts,
   pollForReplies,
+  matchPersonByLinkedIn,
 };

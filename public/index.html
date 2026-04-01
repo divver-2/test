@@ -341,6 +341,26 @@
     .btn-improve:hover:not(:disabled) { border-color: rgba(255,255,255,0.35); color: #fff; }
     .btn-improve:disabled { opacity: 0.45; cursor: default; }
 
+    .linkedin-override {
+      display: flex; gap: 7px; margin-top: 8px; align-items: center;
+    }
+    .linkedin-override-input {
+      flex: 1; background: var(--surface2); border: 1px solid var(--border);
+      border-radius: 8px; padding: 8px 12px; color: var(--text);
+      font-size: 0.82rem; outline: none; transition: border-color 0.15s;
+      min-width: 0;
+    }
+    .linkedin-override-input:focus { border-color: rgba(255,255,255,0.35); }
+    .linkedin-override-input::placeholder { color: var(--muted); opacity: 0.55; }
+    .btn-li-override {
+      padding: 8px 14px; border-radius: 8px; cursor: pointer;
+      font-size: 0.82rem; font-weight: 600; white-space: nowrap; flex-shrink: 0;
+      background: var(--surface2); border: 1px solid var(--border); color: #fff;
+      transition: all 0.15s;
+    }
+    .btn-li-override:hover:not(:disabled) { border-color: rgba(255,255,255,0.35); }
+    .btn-li-override:disabled { opacity: 0.45; cursor: default; }
+
     .hidden { display: none !important; }
 
     @media (max-width: 620px) {
@@ -444,6 +464,10 @@
         <div class="email-box">
           <input type="email" id="ceoEmail" style="font-family:'SF Mono','Fira Code',monospace;font-size:0.845rem;flex:1;background:transparent;border:none;outline:none;color:var(--text);min-width:0;width:100%" placeholder="email not found — enter manually" />
           <span class="badge" id="emailBadge"></span>
+        </div>
+        <div class="linkedin-override">
+          <input type="text" id="liOverrideInput" class="linkedin-override-input" placeholder="Paste correct CEO's LinkedIn URL to override…" onkeydown="if(event.key==='Enter')overrideCEO()" />
+          <button class="btn-li-override" id="liOverrideBtn" onclick="overrideCEO()">Update CEO</button>
         </div>
       </div>
     </div>
@@ -676,6 +700,76 @@ function copyEmail() {
     btn.textContent = 'Copied!';
     setTimeout(() => btn.textContent = 'Copy Email', 2000);
   });
+}
+
+// ── Override CEO via LinkedIn URL ────────────────────────
+async function overrideCEO() {
+  if (!currentResult) return;
+  const linkedinUrl = document.getElementById('liOverrideInput').value.trim();
+  if (!linkedinUrl) { document.getElementById('liOverrideInput').focus(); return; }
+
+  const btn = document.getElementById('liOverrideBtn');
+  btn.disabled = true;
+  btn.textContent = 'Looking up…';
+
+  try {
+    const res = await fetch('/api/ceo-override', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        linkedinUrl,
+        domain: currentResult.company?.domain,
+        companyName: currentResult.company?.name,
+        industry: currentResult.company?.industry,
+        description: currentResult.company?.description,
+        apiKey: getApiKey(),
+      }),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Override failed');
+
+    // Merge updated CEO + email draft into currentResult
+    currentResult.ceo = data.ceo;
+    currentResult.emailDraft = data.emailDraft;
+    currentResult.emailSequence = data.emailSequence;
+
+    // Update CEO display
+    const initials = data.ceo.name
+      ? data.ceo.name.split(' ').map(n => n[0]).join('').slice(0,2).toUpperCase()
+      : '?';
+    document.getElementById('ceoAv').textContent = initials;
+    document.getElementById('ceoName').textContent = data.ceo.name || 'CEO not found';
+    document.getElementById('ceoTitle').textContent = data.ceo.title || 'Chief Executive Officer';
+    document.getElementById('ceoEmail').value = data.ceo.email || '';
+    const liEl = document.getElementById('ceoLinkedin');
+    liEl.innerHTML = data.ceo.linkedinUrl
+      ? `<a href="${esc(data.ceo.linkedinUrl)}" target="_blank" rel="noopener">LinkedIn →</a>`
+      : '';
+
+    const badge = document.getElementById('emailBadge');
+    if (data.ceo.emailVerified) {
+      badge.className = 'badge badge-green'; badge.textContent = '✓ verified';
+    } else if (data.ceo.email) {
+      badge.className = 'badge badge-yellow'; badge.textContent = 'unverified';
+    } else {
+      badge.className = 'badge badge-gray'; badge.textContent = 'not found';
+    }
+
+    // Update email draft
+    if (data.emailDraft) {
+      document.getElementById('draftSubject').textContent = data.emailDraft.subject || '';
+      document.getElementById('draftBody').value = data.emailDraft.body || '';
+      const mailto = `mailto:${esc(data.ceo.email || '')}?subject=${encodeURIComponent(data.emailDraft.subject || '')}&body=${encodeURIComponent(data.emailDraft.body || '')}`;
+      document.getElementById('mailtoLink').href = mailto;
+    }
+
+    document.getElementById('liOverrideInput').value = '';
+  } catch(e) {
+    setStatus('CEO override failed: ' + e.message, 'error');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Update CEO';
+  }
 }
 
 // ── Improve email via Claude ──────────────────────────────
