@@ -15,15 +15,6 @@ function getClient(apiKey) {
   });
 }
 
-function getClientV2(apiKey) {
-  // v2 uses Bearer token — may be a separate token from the v1 API key
-  const v2Token = process.env.AFFINITY_V2_TOKEN || apiKey;
-  return axios.create({
-    baseURL: 'https://api.affinity.co/v2',
-    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${v2Token}` },
-  });
-}
-
 // ── Organizations ─────────────────────────────────────────────────────────────
 
 // Single-page name search — fast, used for read-only lookups where speed matters
@@ -210,36 +201,6 @@ async function findOrganizationExhaustive(domain, name, apiKey) {
   return result;
 }
 
-// Search Affinity v2 API for a company by domain — finds global/network orgs invisible to v1
-async function findOrganizationV2ByDomain(domain, apiKey) {
-  if (!domain) return null;
-  const domainNorm = normalizeDomain(domain);
-  const client = getClientV2(apiKey);
-  // Use pageSize (camelCase) — this is what worked to find Diligent
-  for (const params of [
-    { domain: domainNorm, pageSize: 100 },
-    { term: domainNorm, pageSize: 100 },
-  ]) {
-    try {
-      const res = await client.get('/companies', { params });
-      const companies = res.data?.data || res.data?.companies || (Array.isArray(res.data) ? res.data : []);
-      console.log(`[Affinity v2] search(${JSON.stringify(params)}) → ${companies.length} results`);
-      const match = companies.find(c => {
-        const domains = c.domain_names || c.domains || (c.domain ? [c.domain] : []);
-        return domains.some(d => normalizeDomain(d) === domainNorm);
-      });
-      if (match) {
-        console.log(`[Affinity v2] matched: ${match.name}(${match.id})`);
-        return { id: match.id, name: match.name, domain_names: match.domain_names || match.domains || [] };
-      }
-    } catch (e) {
-      console.log(`[Affinity v2] error (${JSON.stringify(params)}):`, e.response?.status, JSON.stringify(e.response?.data)?.slice(0, 100));
-    }
-  }
-  console.log(`[Affinity v2] not found: ${domainNorm}`);
-  return null;
-}
-
 // Search by CEO email — find the person in Affinity, then get their org
 async function findOrganizationByCeoEmail(ceoEmail, apiKey) {
   if (!ceoEmail) return null;
@@ -315,19 +276,18 @@ async function upsertOrganization({ name, domain, affinityOrgId, ceoEmail, ceoFi
     if (org) { console.log(`[Affinity] using manual org ID ${affinityOrgId} → ${org.name}`); return { org, created: false }; }
   }
   // 1. Run all fast searches in parallel
-  const [v2Result, v1Result, domainTermResult, emailResult, nameResult] = await Promise.all([
-    cleanDomain ? findOrganizationV2ByDomain(cleanDomain, apiKey) : Promise.resolve(null),
+  const [v1Result, domainTermResult, emailResult, nameResult] = await Promise.all([
     cleanDomain ? findOrganizationByDomain(cleanDomain, apiKey) : Promise.resolve(null),
     cleanDomain ? findOrganizationByDomainTerm(cleanDomain, apiKey) : Promise.resolve(null),
     ceoEmail ? findOrganizationByCeoEmail(ceoEmail, apiKey) : Promise.resolve(null),
     (ceoFirstName || ceoLastName) ? findOrganizationByCeoName(ceoFirstName, ceoLastName, apiKey) : Promise.resolve(null),
   ]);
-  let existing = v2Result || v1Result || domainTermResult || emailResult || nameResult;
+  let existing = v1Result || domainTermResult || emailResult || nameResult;
   // 2. Exhaustive scan only if all fast searches failed (slow — last resort)
   if (!existing) existing = await findOrganizationExhaustive(cleanDomain, name, apiKey);
   // 3. Name search only if no domain — avoid matching wrong company by name when domain didn't match
   if (!existing && !cleanDomain) existing = await findOrganization(name, apiKey);
-  const foundByNameOnly = !!(existing && !affinityOrgId && !v2Result && !v1Result && !domainTermResult && !emailResult && !nameResult && !cleanDomain);
+  const foundByNameOnly = !!(existing && !affinityOrgId && !v1Result && !domainTermResult && !emailResult && !nameResult && !cleanDomain);
   if (existing) {
     console.log(`[Affinity] upsertOrganization("${name}") → found: ${existing.name}(${existing.id})`);
     return { org: existing, created: false, foundByNameOnly };
@@ -735,14 +695,13 @@ async function lookupCompanyInAffinity(companyName, apiKey, domain, ceoEmail) {
   const cleanDomain = domain ? normalizeDomain(domain) : null;
 
   // Run all fast searches in parallel — skip exhaustive scan here (read-only lookup, speed matters)
-  const [nameResult, domainResult, v2Result, domainTermResult, ceoEmailResult] = await Promise.all([
+  const [nameResult, domainResult, domainTermResult, ceoEmailResult] = await Promise.all([
     companyName ? findOrganizationFast(companyName, apiKey) : Promise.resolve(null),
     cleanDomain ? findOrganizationByDomain(cleanDomain, apiKey) : Promise.resolve(null),
-    cleanDomain ? findOrganizationV2ByDomain(cleanDomain, apiKey) : Promise.resolve(null),
     cleanDomain ? findOrganizationByDomainTerm(cleanDomain, apiKey) : Promise.resolve(null),
     ceoEmail ? findOrganizationByCeoEmail(ceoEmail, apiKey) : Promise.resolve(null),
   ]);
-  let org = nameResult || domainResult || v2Result || domainTermResult || ceoEmailResult;
+  let org = nameResult || domainResult || domainTermResult || ceoEmailResult;
   if (!org) return null;
 
   const result = {
