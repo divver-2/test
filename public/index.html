@@ -915,21 +915,12 @@ function renderResult(data) {
   // Send status
   const hasOwner = !!(affinity?.owners?.length || affinity?.owner);
   const ownerList = (affinity?.owners?.length ? affinity.owners : (affinity?.owner ? [affinity.owner] : [])).map(esc).join(', ');
-  const notInAffinity = !affinity?.inAffinity;
   document.getElementById('sendStatus').innerHTML = hasOwner
     ? `<div class="send-status send-status-warn">
         <span class="send-status-icon">⚠️</span>
         <div>
           <div>Confirm before sending</div>
           <div class="send-status-sub">This company already has an owner in Affinity: ${ownerList}</div>
-        </div>
-      </div>`
-    : notInAffinity
-    ? `<div class="send-status send-status-warn">
-        <span class="send-status-icon">⚠️</span>
-        <div>
-          <div>OK to send — not in Affinity</div>
-          <div class="send-status-sub">Company not found in Affinity — sourcing list will not be updated</div>
         </div>
       </div>`
     : `<div class="send-status send-status-ok">
@@ -1062,6 +1053,8 @@ async function launchOutreach() {
       const aff = data.affinity;
       const affLine = aff?.addedToList
         ? `Added to <b>${esc(aff.listName || 'Sourcing List')}</b>${aff.chasingSet ? ' · Status: <b>Chasing</b>' : ''}${aff.globalOwner ? ` · Owner: <b>${esc(aff.globalOwner)}</b>` : ''}`
+        : aff?.notFound
+        ? `<span style="color:var(--muted)">Company not found in Affinity — sourcing list not updated</span>`
         : (aff ? `<span style="color:var(--yellow)">⚠ Affinity: ${esc((aff.errors || []).join(', ') || 'not added to list')}</span>` : '');
       sendStatusEl.innerHTML = `<div class="send-status send-status-ok" style="margin:0 0 14px">
         <span class="send-status-icon">✅</span>
