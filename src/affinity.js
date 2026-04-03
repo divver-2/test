@@ -292,16 +292,9 @@ async function upsertOrganization({ name, domain, affinityOrgId, ceoEmail, ceoFi
     console.log(`[Affinity] upsertOrganization("${name}") → found: ${existing.name}(${existing.id})`);
     return { org: existing, created: false, foundByNameOnly };
   }
-  // Not found — create it so it gets added to the sourcing list
-  console.log(`[Affinity] upsertOrganization("${name}") → not found, creating new org`);
-  try {
-    const created = await createOrganization({ name, domain: cleanDomain }, apiKey);
-    console.log(`[Affinity] created new org: ${created.name}(${created.id})`);
-    return { org: created, created: true };
-  } catch (e) {
-    console.log('[Affinity] createOrganization error:', e.response?.status, e.message);
-    return { org: null, created: false };
-  }
+  // Not found — skip, do not create
+  console.log(`[Affinity] upsertOrganization("${name}") → not found in Affinity, skipping`);
+  return { org: null, created: false };
 }
 
 // ── Persons ───────────────────────────────────────────────────────────────────
