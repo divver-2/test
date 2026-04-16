@@ -502,7 +502,7 @@ async function addCompany() {
   if (!companyName) { setStatus('Please enter a company name or domain.', 'error'); return; }
 
   document.getElementById('resultCard').classList.add('hidden');
-  setStatus(`Looking up <strong>${esc(companyName)}</strong>… (Claude is fulfilling the lookup)`, 'loading');
+  setStatus(`Looking up <strong>${esc(companyName)}</strong>…`, 'loading');
   document.getElementById('addBtn').disabled = true;
 
   try {
