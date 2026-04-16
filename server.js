@@ -407,7 +407,7 @@ app.post('/api/cache/clear', (req, res) => {
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 3006;
 app.listen(PORT, () => {
   console.log(`\nCEO Outreach Tool running at http://localhost:${PORT}\n`);
 
