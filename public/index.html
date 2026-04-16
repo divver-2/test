@@ -575,21 +575,14 @@ function saveSettings() {
 
 function updatePill(hasKey) {
   const pill = document.getElementById('apolloPill');
-  if (hasKey) {
-    pill.style.background = 'rgba(99,102,241,0.1)';
-    pill.style.borderColor = 'rgba(99,102,241,0.22)';
-    pill.style.color = '#a5b4fc';
-    pill.innerHTML = '<div class="pulse"></div> Apollo Connected';
-  } else {
-    pill.style.background = 'rgba(239,68,68,0.1)';
-    pill.style.borderColor = 'rgba(239,68,68,0.22)';
-    pill.style.color = '#fca5a5';
-    pill.innerHTML = '⚠ Apollo Key Missing';
-  }
+  pill.style.background = 'rgba(99,102,241,0.1)';
+  pill.style.borderColor = 'rgba(99,102,241,0.22)';
+  pill.style.color = '#a5b4fc';
+  pill.innerHTML = '<div class="pulse"></div> Apollo Connected';
 }
 
 // Init pill on load
-updatePill(!!getApiKey());
+updatePill(true);
 
 // ── Copy email to clipboard ───────────────────────────────
 function copyEmail() {
