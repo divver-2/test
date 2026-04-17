@@ -392,6 +392,21 @@ app.post('/api/ceo-override', async (req, res) => {
 // Health check
 app.get('/api/health', (_, res) => res.json({ ok: true }));
 
+// Debug: test Affinity key — visit /api/affinity-test?key=YOUR_KEY or uses env var
+app.get('/api/affinity-test', async (req, res) => {
+  const axios = require('axios');
+  const key = req.query.key || process.env.AFFINITY_API_KEY || '';
+  if (!key) return res.json({ error: 'no key — pass ?key=YOUR_KEY or set AFFINITY_API_KEY env var', envKeyPresent: false });
+  try {
+    const r = await axios.get('https://api.affinity.co/auth/whoami', {
+      auth: { username: '', password: key },
+    });
+    res.json({ ok: true, user: r.data, keyLength: key.length, envKeyPresent: !!process.env.AFFINITY_API_KEY });
+  } catch (e) {
+    res.json({ ok: false, status: e.response?.status, error: e.response?.data || e.message, keyLength: key.length, envKeyPresent: !!process.env.AFFINITY_API_KEY });
+  }
+});
+
 // Clear cached org ID for a domain (use when Affinity org was deleted/changed)
 app.post('/api/cache/clear', (req, res) => {
   const { domain } = req.body;
