@@ -206,6 +206,9 @@
     .send-status-warn {
       background: var(--yellow-soft); border: 1px solid rgba(245,158,11,0.3); color: var(--yellow);
     }
+    .send-status-red {
+      background: var(--red-soft); border: 1px solid rgba(239,68,68,0.3); color: var(--red);
+    }
     .send-status-icon { font-size: 1.1rem; flex-shrink: 0; }
     .send-status-sub { font-size: 0.775rem; font-weight: 400; opacity: 0.85; margin-top: 1px; }
 
@@ -914,13 +917,22 @@ function renderResult(data) {
 
   // Send status
   const hasOwner = !!(affinity?.owners?.length || affinity?.owner);
+  const hasEmailHistory = !!(affinity?.lastEmailDate);
   const ownerList = (affinity?.owners?.length ? affinity.owners : (affinity?.owner ? [affinity.owner] : [])).map(esc).join(', ');
-  document.getElementById('sendStatus').innerHTML = hasOwner
+  const statusHtml = hasOwner
+    ? `<div class="send-status send-status-red">
+        <span class="send-status-icon">🚫</span>
+        <div>
+          <div>Someone covers this company</div>
+          <div class="send-status-sub">${ownerList} is the owner in Affinity — check with them before reaching out</div>
+        </div>
+      </div>`
+    : hasEmailHistory
     ? `<div class="send-status send-status-warn">
         <span class="send-status-icon">⚠️</span>
         <div>
-          <div>Confirm before sending</div>
-          <div class="send-status-sub">This company already has an owner in Affinity: ${ownerList}</div>
+          <div>Check Affinity before sending</div>
+          <div class="send-status-sub">Someone at NewView has emailed this company before — verify it's OK to reach out</div>
         </div>
       </div>`
     : `<div class="send-status send-status-ok">
@@ -930,6 +942,7 @@ function renderResult(data) {
           <div class="send-status-sub">No owner assigned in Affinity — safe to reach out</div>
         </div>
       </div>`;
+  document.getElementById('sendStatus').innerHTML = statusHtml;
 
   document.getElementById('resultCard').classList.remove('hidden');
 }
