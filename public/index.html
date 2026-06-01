@@ -561,35 +561,27 @@
 
 </div>
 
-<!-- Database view -->
-<div class="container" id="databaseView" style="display:none">
-  <div class="card">
-    <div class="history-head" style="margin-bottom:20px">
-      <div style="display:flex;align-items:center;gap:14px">
-        <button class="btn-gear" onclick="showView('main')" style="font-size:0.82rem;padding:6px 14px;font-weight:600">← Back</button>
-        <h2 style="font-size:1rem;font-weight:700;color:var(--text);text-transform:none;letter-spacing:0">Outreach Database</h2>
+<!-- Outreach Tracker view -->
+<div class="container" id="databaseView" style="display:none;padding-bottom:60px">
+
+  <!-- Header -->
+  <div style="display:flex;align-items:center;justify-content:space-between;padding:36px 0 24px">
+    <div style="display:flex;align-items:center;gap:16px">
+      <button onclick="showView('main')" style="background:none;border:1px solid var(--border);border-radius:8px;color:var(--muted);padding:7px 14px;font-size:0.82rem;cursor:pointer;font-weight:500">← Back</button>
+      <div>
+        <div style="font-size:1.3rem;font-weight:700;letter-spacing:-0.3px">Outreach Tracker</div>
+        <div style="font-size:0.8rem;color:var(--muted);margin-top:2px">Everyone you've reached out to</div>
       </div>
-      <span id="dbCount" style="font-size:0.78rem;color:var(--muted)"></span>
     </div>
-    <div style="margin-bottom:14px">
-      <input type="text" id="dbSearch" placeholder="Search company or CEO…" oninput="filterDatabase()" style="max-width:320px;font-size:0.85rem;padding:8px 13px" />
-    </div>
-    <div class="table-wrap">
-      <table>
-        <thead>
-          <tr>
-            <th>Company</th>
-            <th>CEO</th>
-            <th>Email</th>
-            <th>Sent</th>
-            <th>Days Since</th>
-            <th>Follow-up</th>
-          </tr>
-        </thead>
-        <tbody id="databaseBody"><tr><td colspan="6" style="color:var(--muted);text-align:center;padding:20px">Loading…</td></tr></tbody>
-      </table>
-    </div>
+    <input type="text" id="dbSearch" placeholder="Search…" oninput="filterDatabase()" style="width:200px;font-size:0.85rem;padding:8px 13px;background:var(--surface);border:1px solid var(--border);border-radius:8px;color:var(--text)" />
   </div>
+
+  <!-- Stats bar -->
+  <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:20px" id="dbStats"></div>
+
+  <!-- Rows -->
+  <div id="databaseBody" style="display:flex;flex-direction:column;gap:8px"></div>
+
 </div>
 
 <script>
@@ -1271,17 +1263,32 @@ function showView(view) {
 }
 
 async function loadDatabase() {
-  const tbody = document.getElementById('databaseBody');
-  const countEl = document.getElementById('dbCount');
-  tbody.innerHTML = `<tr><td colspan="6" style="color:var(--muted);text-align:center;padding:20px">Loading…</td></tr>`;
+  const body = document.getElementById('databaseBody');
+  body.innerHTML = `<div style="color:var(--muted);text-align:center;padding:40px">Loading…</div>`;
   try {
     const res = await fetch('/api/outreach-log');
     _allOutreach = await res.json();
-    countEl.textContent = `${_allOutreach.length} companies`;
+    renderStats(_allOutreach);
     renderDatabase(_allOutreach);
   } catch(e) {
-    tbody.innerHTML = `<tr><td colspan="6" style="color:var(--muted);text-align:center;padding:20px">Failed to load</td></tr>`;
+    body.innerHTML = `<div style="color:var(--muted);text-align:center;padding:40px">Failed to load</div>`;
   }
+}
+
+function renderStats(items) {
+  const now = Date.now();
+  const total = items.length;
+  const due = items.filter(r => !r.followUpSentAt && r.sentAt && (now - new Date(r.sentAt).getTime()) >= 30*86400000).length;
+  const done = items.filter(r => r.followUpSentAt).length;
+  document.getElementById('dbStats').innerHTML = [
+    { label: 'Total Sent', value: total, color: 'var(--text)' },
+    { label: 'Follow-ups Due', value: due, color: due ? 'var(--yellow)' : 'var(--text)' },
+    { label: 'Follow-ups Sent', value: done, color: 'var(--green)' },
+  ].map(s => `
+    <div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:18px 20px">
+      <div style="font-size:1.8rem;font-weight:700;color:${s.color}">${s.value}</div>
+      <div style="font-size:0.75rem;color:var(--muted);margin-top:4px;text-transform:uppercase;letter-spacing:0.06em">${s.label}</div>
+    </div>`).join('');
 }
 
 function filterDatabase() {
@@ -1295,29 +1302,34 @@ function filterDatabase() {
 }
 
 function renderDatabase(items) {
-  const tbody = document.getElementById('databaseBody');
+  const body = document.getElementById('databaseBody');
   if (!items.length) {
-    tbody.innerHTML = `<tr><td colspan="6" style="color:var(--muted);text-align:center;padding:20px">No results</td></tr>`;
+    body.innerHTML = `<div style="color:var(--muted);text-align:center;padding:40px;background:var(--surface);border:1px solid var(--border);border-radius:12px">No results</div>`;
     return;
   }
   const now = Date.now();
-  tbody.innerHTML = items.map(item => {
-    const days = item.sentAt ? Math.floor((now - new Date(item.sentAt).getTime()) / 86400000) : '—';
-    const followUp = item.followUpSentAt
-      ? `<span class="badge badge-green">✓ Sent</span>`
-      : (typeof days === 'number' && days >= 30)
-      ? `<span class="badge badge-yellow">⚠ Due</span>`
-      : typeof days === 'number'
-      ? `<span style="color:var(--muted);font-size:0.8rem">In ${30 - days}d</span>`
-      : '—';
-    return `<tr>
-      <td><div class="td-co-name">${esc(item.companyName || item.domain)}</div><div class="td-co-domain">${esc(item.domain)}</div></td>
-      <td>${esc(item.ceoName || '—')}</td>
-      <td class="td-email">${esc(item.ceoEmail || '—')}</td>
-      <td class="td-date">${fmtDate(item.sentAt)}</td>
-      <td style="color:var(--muted);font-size:0.85rem">${typeof days === 'number' ? days + 'd' : '—'}</td>
-      <td>${followUp}</td>
-    </tr>`;
+  body.innerHTML = items.map(item => {
+    const days = item.sentAt ? Math.floor((now - new Date(item.sentAt).getTime()) / 86400000) : null;
+    const due = days !== null && days >= 30 && !item.followUpSentAt;
+    const initial = (item.companyName || item.domain || '?')[0].toUpperCase();
+    const statusBadge = item.followUpSentAt
+      ? `<span style="background:rgba(16,185,129,0.12);color:var(--green);border:1px solid rgba(16,185,129,0.25);border-radius:20px;padding:3px 10px;font-size:0.73rem;font-weight:600">✓ Followed up</span>`
+      : due
+      ? `<span style="background:rgba(245,158,11,0.1);color:var(--yellow);border:1px solid rgba(245,158,11,0.3);border-radius:20px;padding:3px 10px;font-size:0.73rem;font-weight:600">⚠ Follow-up due</span>`
+      : `<span style="background:var(--surface2);color:var(--muted);border:1px solid var(--border);border-radius:20px;padding:3px 10px;font-size:0.73rem">In ${30 - days}d</span>`;
+    const rowBorder = due ? 'border-left:3px solid var(--yellow)' : item.followUpSentAt ? 'border-left:3px solid var(--green)' : 'border-left:3px solid transparent';
+    return `<div style="display:flex;align-items:center;gap:16px;background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:14px 18px;${rowBorder}">
+      <div style="width:38px;height:38px;border-radius:9px;background:var(--surface2);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:0.95rem;flex-shrink:0">${esc(initial)}</div>
+      <div style="flex:1;min-width:0">
+        <div style="font-weight:600;font-size:0.9rem">${esc(item.companyName || item.domain)}</div>
+        <div style="font-size:0.78rem;color:var(--muted);margin-top:2px">${esc(item.ceoName || '')}${item.ceoEmail ? ' · ' + esc(item.ceoEmail) : ''}</div>
+      </div>
+      <div style="text-align:right;flex-shrink:0">
+        <div style="font-size:0.78rem;color:var(--muted)">${fmtDate(item.sentAt)}</div>
+        <div style="font-size:0.73rem;color:var(--muted);margin-top:2px">${days !== null ? days + ' days ago' : ''}</div>
+      </div>
+      <div style="flex-shrink:0">${statusBadge}</div>
+    </div>`;
   }).join('');
 }
 
