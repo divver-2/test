@@ -508,7 +508,7 @@ Write the email with exactly this 3-paragraph structure — concise, warm, not a
 
 "Hi ${firstName},"
 [blank line]
-Paragraph 1 — Introduction: "Hope all is well, I'm an investor at NewView Capital - a $3.1bn venture growth fund. We've been spending a lot of time in [the specific space ${companyName} operates in] and have made investments in adjacent categories, including [1-2 most relevant NewView portfolio companies]."
+Paragraph 1 — Introduction: "Hope all is well, I'm an investor at NewView Capital - a $3.1bn venture growth fund. We've been spending a lot of time in [the specific space ${companyName} operates in] and have made investments in [name the specific sub-spaces or categories, e.g. 'observability, data infrastructure, and developer tooling'], including [1-2 most relevant NewView portfolio companies]."
 [blank line]
 Paragraph 2 — Conviction + thesis: Start with "We have a lot of conviction about what you are building." Then ${hasInsights
   ? `build the thesis using the customer insights provided — explain what ${companyName} does better than competitors (name 1-2) and weave in the customer voice naturally, e.g. "customers highlight [insight] as a key reason they chose ${companyName}." Keep it to 2-3 sentences.`
