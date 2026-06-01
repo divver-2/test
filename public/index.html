@@ -388,7 +388,7 @@
   <div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end;align-items:center">
     <div class="apollo-pill" id="apolloPill"><div class="pulse"></div> Apollo</div>
     <div class="apollo-pill" style="background:rgba(16,185,129,0.1);border-color:rgba(16,185,129,0.22);color:#6ee7b7"><div class="pulse"></div> Affinity</div>
-    <button class="btn-gear" onclick="showView('database')" title="Outreach Database" id="dbBtn" style="padding:6px 14px;font-size:0.78rem;font-weight:600;letter-spacing:0.03em">Database</button>
+    <button class="btn-gear" onclick="showView('database')" title="Outreach Tracker" id="dbBtn" style="padding:6px 14px;font-size:0.78rem;font-weight:600;letter-spacing:0.03em">Outreach Tracker</button>
     <button class="btn-gear" onclick="toggleSettings()" title="Settings">⚙</button>
   </div>
 </div>
@@ -1257,7 +1257,7 @@ function showView(view) {
   } else {
     db.style.display = 'none';
     main.style.display = 'block';
-    dbBtn.textContent = 'Database';
+    dbBtn.textContent = 'Outreach Tracker';
     dbBtn.onclick = () => showView('database');
   }
 }
