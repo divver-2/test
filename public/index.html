@@ -498,8 +498,25 @@
         <a class="btn-mailto" id="mailtoLink" href="#">Open in Email App</a>
         <button class="btn btn-primary" id="launchBtn" onclick="launchOutreach()" style="padding:8px 18px;font-size:0.85rem">Sequence Launch</button>
       </div>
-
     </div>
+
+    <!-- Research email -->
+    <div class="email-draft" id="researchEmailSection" style="display:none;border-top:1px solid var(--border);margin-top:0;border-radius:0 0 var(--radius) var(--radius)">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+        <div class="col-label">Research Email</div>
+        <span style="font-size:0.75rem;color:var(--muted)">More detailed — references competitors &amp; NewView portfolio</span>
+      </div>
+      <textarea class="draft-body" id="researchBody" style="min-height:220px"></textarea>
+      <div class="draft-actions" style="margin-top:10px">
+        <button class="btn-copy" onclick="copyResearchEmail()">Copy Email</button>
+        <button class="btn" id="regenResearchBtn" onclick="generateResearchEmail()" style="font-size:0.82rem;padding:8px 16px">↺ Regenerate</button>
+      </div>
+    </div>
+
+    <div style="padding:10px 24px 4px">
+      <button class="btn" id="researchEmailBtn" onclick="generateResearchEmail()" style="font-size:0.82rem;padding:8px 18px;width:100%;background:var(--surface2);border:1px solid var(--border)">✦ Generate Research Email</button>
+    </div>
+
   </div>
 
   <!-- History table -->
@@ -583,6 +600,8 @@ async function addCompany() {
   }
 
   document.getElementById('resultCard').classList.add('hidden');
+  document.getElementById('researchEmailSection').style.display = 'none';
+  document.getElementById('researchBody').value = '';
   setStatus(`Looking up <strong>${esc(companyName)}</strong>…`, 'loading');
   document.getElementById('addBtn').disabled = true;
 
@@ -703,6 +722,59 @@ function copyEmail() {
     btn.textContent = 'Copied!';
     setTimeout(() => btn.textContent = 'Copy Email', 2000);
   });
+}
+
+function copyResearchEmail() {
+  const body = document.getElementById('researchBody').value;
+  navigator.clipboard.writeText(body).then(() => {
+    const btn = document.querySelector('#researchEmailSection .btn-copy');
+    btn.textContent = 'Copied!';
+    setTimeout(() => btn.textContent = 'Copy Email', 2000);
+  });
+}
+
+async function generateResearchEmail() {
+  if (!currentResult) return;
+  const btn = document.getElementById('researchEmailBtn');
+  const regenBtn = document.getElementById('regenResearchBtn');
+  const section = document.getElementById('researchEmailSection');
+  const textarea = document.getElementById('researchBody');
+
+  if (btn) { btn.disabled = true; btn.textContent = 'Generating…'; }
+  if (regenBtn) { regenBtn.disabled = true; regenBtn.textContent = 'Generating…'; }
+  textarea.value = '';
+  section.style.display = 'block';
+  textarea.placeholder = 'Generating research email…';
+
+  try {
+    const { company, ceo } = currentResult;
+    const res = await fetch('/api/research-email', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        companyName: company?.name,
+        domain: company?.domain,
+        industry: company?.industry,
+        description: company?.description,
+        funding: company?.funding,
+        fundingStage: company?.fundingStage,
+        employees: company?.employees,
+        ceoName: ceo?.name,
+        ceoFirstName: ceo?.firstName,
+      }),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Failed');
+    textarea.value = data.body;
+    textarea.placeholder = '';
+  } catch (e) {
+    textarea.value = '';
+    textarea.placeholder = 'Failed to generate: ' + e.message;
+    setStatus('Research email failed: ' + e.message, 'error');
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = '✦ Generate Research Email'; }
+    if (regenBtn) { regenBtn.disabled = false; regenBtn.textContent = '↺ Regenerate'; }
+  }
 }
 
 // ── Override CEO via LinkedIn URL ────────────────────────

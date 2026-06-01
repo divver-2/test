@@ -407,6 +407,68 @@ app.get('/api/affinity-test', async (req, res) => {
   }
 });
 
+const NEWVIEW_PORTFOLIO = [
+  '23andMe','Acquia','Aera','Aerospike','Apollo','Arbor','BenchPrep','Bird','Bloomreach',
+  'Boku','Canopy','ClearMotion','CloudBees','CloudWalk','Clumio','Code42','ContentSquare',
+  'Coralogix','Coursera','Cyberhaven','Databricks','Datavisor','Demandbase','Desire2Learn',
+  'Didi Chuxing','Duolingo','Enable','Eucalyptus','Evernote','FloQast','Farther','Forma',
+  'Forter','Gladly','GumGum','Halter','Hearsay','Hibob','Hightouch','Hims','Hinge',
+  'Housecall Pro','Human Interest','Huntress','Intercom','Island','LaunchDarkly','Learneo',
+  'Legora','Levelpath','Lumin','MasterClass','Mercury','MindTickle','Modern Treasury',
+  'NetraDyne','Nium','Node.io','Owner','Paystand','Plaid','Prepared911','Rapyd','Reltio',
+  'Sciencelogic','Scopely','Scout','Segment.io','Sigma','Silverfort','Solera','Stord',
+  'Topia','Uber','Udemy','Vendia','Verkada','Versusgame','Veryfi','Viewlift','Vitally',
+  'Wellhub','Workato','Bubble','EvenUp','Grow Therapy','Horizon3.ai','Monarch Money',
+  'Motion','OneSignal','PlanetScale','Ro','Verse Medical',
+];
+
+// Generate a detailed research-backed email using Claude + NewView portfolio context
+app.post('/api/research-email', async (req, res) => {
+  const { companyName, domain, industry, description, funding, fundingStage, employees, ceoName, ceoFirstName } = req.body;
+  const anthropicKey = process.env.ANTHROPIC_API_KEY;
+  if (!anthropicKey) return res.status(400).json({ error: 'ANTHROPIC_API_KEY not configured' });
+
+  try {
+    const client = new Anthropic({ apiKey: anthropicKey });
+    const firstName = ceoFirstName || (ceoName || '').split(' ')[0] || 'there';
+    const msg = await client.messages.create({
+      model: 'claude-sonnet-4-6',
+      max_tokens: 700,
+      messages: [{
+        role: 'user',
+        content: `You are David Divver, a partner at NewView Capital, a $3.1bn venture growth fund. Write a detailed investor outreach email to the CEO of ${companyName}.
+
+Company context:
+- Name: ${companyName}
+- Domain: ${domain || ''}
+- Industry: ${industry || ''}
+- Description: ${description || ''}
+- Funding raised: ${funding || 'undisclosed'}
+- Stage: ${fundingStage || ''}
+- Employees: ${employees || 'unknown'}
+- CEO: ${ceoName || ''}
+
+NewView Capital portfolio (pick 1-2 most relevant/adjacent companies to reference):
+${NEWVIEW_PORTFOLIO.join(', ')}
+
+Write an email with this exact structure:
+Line 1: "Hi ${firstName},"
+Line 2 (blank line then): "Hope all is well, I'm an investor at NewView Capital - a $3.1bn venture growth fund."
+Paragraph: 2-3 sentences showing deep research — name 2-3 specific competitors and explain exactly how ${companyName} differentiates (be specific, not generic).
+Paragraph: 1-2 sentences referencing the 1-2 most relevant NewView portfolio companies and why that makes NewView a natural partner for ${companyName}.
+Line: "I'm excited about what you are building and wanted to see if it was a good time to connect."
+Sign off: "Thanks," then new line "David"
+
+Reply with only the email body. Be specific and research-backed, not generic.`,
+      }],
+    });
+    res.json({ body: msg.content[0].text.trim() });
+  } catch (err) {
+    console.error('[/api/research-email] Error:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // Clear cached org ID for a domain (use when Affinity org was deleted/changed)
 app.post('/api/cache/clear', (req, res) => {
   const { domain } = req.body;
