@@ -5,7 +5,11 @@ const FOLLOWUP_DAYS = 30;
 let pool;
 function getPool() {
   if (!pool) {
-    pool = new Pool({ connectionString: process.env.DATABASE_URL, ssl: { rejectUnauthorized: false } });
+    const url = process.env.DATABASE_URL;
+    if (!url) throw new Error('DATABASE_URL is not set');
+    // Railway internal URLs (.railway.internal) don't use SSL; external URLs do
+    const isInternal = url.includes('.railway.internal') || url.includes('localhost') || url.includes('127.0.0.1');
+    pool = new Pool({ connectionString: url, ssl: isInternal ? false : { rejectUnauthorized: false } });
   }
   return pool;
 }
@@ -32,7 +36,7 @@ async function init() {
 }
 
 async function ensureInit() {
-  try { await init(); } catch(e) { console.error('[tracker] DB init error:', e.message); }
+  try { await init(); } catch(e) { console.error('[tracker] DB init error:', e.message || e.code || String(e)); }
 }
 
 // Log an outreach send
