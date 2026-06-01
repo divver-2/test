@@ -504,24 +504,22 @@ ${insightsBlock}
 NewView Capital portfolio (pick 1-2 most relevant/adjacent companies to reference):
 ${NEWVIEW_PORTFOLIO.join(', ')}
 
-Write the email with this exact structure — tight and warm, not a research report:
+Write the email with exactly this 3-paragraph structure — concise, warm, not a research report:
 
 "Hi ${firstName},"
 [blank line]
-"Hope all is well, I'm an investor at NewView Capital - a $3.1bn venture growth fund. We've invested heavily in [the specific space ${companyName} operates in], including investments in [1-2 most relevant NewView portfolio companies]."
+Paragraph 1 — Introduction: "Hope all is well, I'm an investor at NewView Capital - a $3.1bn venture growth fund. We've been spending a lot of time in [the specific space ${companyName} operates in] and have made investments in adjacent categories, including [1-2 most relevant NewView portfolio companies]."
 [blank line]
-${hasInsights
-  ? `1-2 sentences on what makes ${companyName} differentiated vs competitors (name 1-2 competitors), then weave in the customer voice naturally — e.g. "We've spoken with customers who specifically highlight [insight] as a key reason they chose ${companyName} over [competitor]."`
-  : `One sentence on what specifically makes ${companyName} differentiated — name 1-2 direct competitors and call out the specific edge. Be concrete, not generic.`}
+Paragraph 2 — Conviction + thesis: Start with "We have a lot of conviction about what you are building." Then ${hasInsights
+  ? `build the thesis using the customer insights provided — explain what ${companyName} does better than competitors (name 1-2) and weave in the customer voice naturally, e.g. "customers highlight [insight] as a key reason they chose ${companyName}." Keep it to 2-3 sentences.`
+  : `explain in 2-3 sentences why ${companyName} is differentiated vs competitors (name 1-2) and why this market matters now.`}
 [blank line]
-1-2 sentences sharing NewView's thesis on why this category matters and why ${companyName} is well-positioned.
-[blank line]
-"We would love to find a way to partner together and wanted to see if it was a good time to connect."
+Paragraph 3 — CTA: "We would love to find a way to partner together and have a lot of conviction in the space. Would you be open to a call?"
 [blank line]
 "Thanks,"
 "David"
 
-Reply with only the email body. Keep it tight.`,
+Reply with only the email body. Keep it tight — 3 paragraphs only.`,
       }],
     });
     res.json({ body: msg.content[0].text.trim().replace(/—/g, '-') });
