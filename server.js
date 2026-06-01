@@ -422,21 +422,71 @@ const NEWVIEW_PORTFOLIO = [
   'Motion','OneSignal','PlanetScale','Ro','Verse Medical',
 ];
 
+// Parse a customer call transcript and extract differentiation insights
+app.post('/api/parse-transcript', async (req, res) => {
+  const { transcript, companyName } = req.body;
+  if (!transcript) return res.status(400).json({ error: 'transcript is required' });
+  const anthropicKey = process.env.ANTHROPIC_API_KEY;
+  if (!anthropicKey) return res.status(400).json({ error: 'ANTHROPIC_API_KEY not configured' });
+
+  try {
+    const client = new Anthropic({ apiKey: anthropicKey });
+    const msg = await client.messages.create({
+      model: 'claude-sonnet-4-6',
+      max_tokens: 400,
+      messages: [{
+        role: 'user',
+        content: `You are analyzing a customer call transcript for ${companyName || 'a company'}.
+
+Extract 3-5 specific things customers said that highlight why they chose this product and what makes it better than alternatives. Focus on:
+- Specific pain points it solves that competitors don't
+- Features or capabilities customers specifically praised
+- Reasons they switched from or chose over a competitor
+- Quantifiable outcomes or results they mentioned
+
+Return ONLY a JSON array of short strings (each under 20 words), like:
+["insight one", "insight two", "insight three"]
+
+Transcript:
+${transcript.slice(0, 8000)}`,
+      }],
+    });
+
+    let insights = [];
+    try {
+      const text = msg.content[0].text.trim();
+      const match = text.match(/\[[\s\S]*\]/);
+      insights = match ? JSON.parse(match[0]) : [];
+    } catch { insights = []; }
+
+    res.json({ insights });
+  } catch (err) {
+    console.error('[/api/parse-transcript] Error:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // Generate a detailed research-backed email using Claude + NewView portfolio context
 app.post('/api/research-email', async (req, res) => {
-  const { companyName, domain, industry, description, funding, fundingStage, employees, ceoName, ceoFirstName } = req.body;
+  const { companyName, domain, industry, description, funding, fundingStage, employees, ceoName, ceoFirstName, customerInsights } = req.body;
   const anthropicKey = process.env.ANTHROPIC_API_KEY;
   if (!anthropicKey) return res.status(400).json({ error: 'ANTHROPIC_API_KEY not configured' });
 
   try {
     const client = new Anthropic({ apiKey: anthropicKey });
     const firstName = ceoFirstName || (ceoName || '').split(' ')[0] || 'there';
+    const hasInsights = Array.isArray(customerInsights) && customerInsights.length > 0;
+    const insightsBlock = hasInsights
+      ? `\nCustomer feedback from calls (weave into the differentiation sentence naturally — attribute it as "we've spoken with customers who highlight..."):
+${customerInsights.map((s, i) => `${i + 1}. ${s}`).join('\n')}\n`
+      : '';
+
     const msg = await client.messages.create({
       model: 'claude-sonnet-4-6',
       max_tokens: 700,
       messages: [{
         role: 'user',
-        content: `You are David Divver, a partner at NewView Capital, a $3.1bn venture growth fund. Write a detailed investor outreach email to the CEO of ${companyName}.
+        content: `You are David Divver, a partner at NewView Capital, a $3.1bn venture growth fund. Write a concise investor outreach email to the CEO of ${companyName}.
 
 Company context:
 - Name: ${companyName}
@@ -447,26 +497,28 @@ Company context:
 - Stage: ${fundingStage || ''}
 - Employees: ${employees || 'unknown'}
 - CEO: ${ceoName || ''}
-
+${insightsBlock}
 NewView Capital portfolio (pick 1-2 most relevant/adjacent companies to reference):
 ${NEWVIEW_PORTFOLIO.join(', ')}
 
-Write a concise investor outreach email with this exact structure — keep the same tight, warm tone as a cold outreach, not a research report:
+Write the email with this exact structure — tight and warm, not a research report:
 
 "Hi ${firstName},"
 [blank line]
 "Hope all is well, I'm an investor at NewView Capital - a $3.1bn venture growth fund."
 [blank line]
-One sentence on what specifically makes ${companyName} differentiated — name 1-2 direct competitors and call out the specific technical or go-to-market edge ${companyName} has over them. Be concrete, not generic.
+${hasInsights
+  ? `1-2 sentences on what makes ${companyName} differentiated vs competitors (name 1-2 competitors), then weave in the customer voice naturally — e.g. "We've spoken with customers who specifically highlight [insight] as a key reason they chose ${companyName} over [competitor]."`
+  : `One sentence on what specifically makes ${companyName} differentiated — name 1-2 direct competitors and call out the specific edge. Be concrete, not generic.`}
 [blank line]
-One paragraph (2-3 sentences) building out NewView's thesis in this space: mention that we've spent a lot of time investing in [the specific space ${companyName} operates in], reference the 1-2 most relevant NewView portfolio companies by name, and say we have a thesis around why this category is important.
+2-3 sentences: we've spent a lot of time investing in [the specific space], reference 1-2 relevant NewView portfolio companies, and share a thesis on why this category matters.
 [blank line]
 "We would love to find a way to partner together and wanted to see if it was a good time to connect."
 [blank line]
 "Thanks,"
 "David"
 
-Reply with only the email body. Keep it tight — this is a cold outreach, not an essay.`,
+Reply with only the email body. Keep it tight.`,
       }],
     });
     res.json({ body: msg.content[0].text.trim() });

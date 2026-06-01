@@ -513,7 +513,16 @@
       </div>
     </div>
 
-    <div style="padding:10px 24px 4px">
+    <div style="padding:10px 24px 4px;display:flex;flex-direction:column;gap:8px">
+      <!-- Transcript upload -->
+      <div id="transcriptArea" style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+        <input type="file" id="transcriptFile" accept=".txt,.md" style="display:none" onchange="handleTranscriptUpload(event)" />
+        <button class="btn" onclick="document.getElementById('transcriptFile').click()" style="font-size:0.8rem;padding:7px 14px;background:var(--surface2);border:1px solid var(--border)">⬆ Upload Call Transcript</button>
+        <span id="transcriptStatus" style="font-size:0.78rem;color:var(--muted)">Optional — adds customer voice to differentiation</span>
+      </div>
+      <!-- Insights chips -->
+      <div id="insightChips" style="display:none;flex-wrap:wrap;gap:6px"></div>
+      <!-- Generate button -->
       <button class="btn" id="researchEmailBtn" onclick="generateResearchEmail()" style="font-size:0.82rem;padding:8px 18px;width:100%;background:var(--surface2);border:1px solid var(--border)">✦ Generate Research Email</button>
     </div>
 
@@ -602,6 +611,11 @@ async function addCompany() {
   document.getElementById('resultCard').classList.add('hidden');
   document.getElementById('researchEmailSection').style.display = 'none';
   document.getElementById('researchBody').value = '';
+  customerInsights = [];
+  document.getElementById('transcriptStatus').textContent = 'Optional — adds customer voice to differentiation';
+  document.getElementById('transcriptStatus').style.color = 'var(--muted)';
+  document.getElementById('insightChips').style.display = 'none';
+  document.getElementById('insightChips').innerHTML = '';
   setStatus(`Looking up <strong>${esc(companyName)}</strong>…`, 'loading');
   document.getElementById('addBtn').disabled = true;
 
@@ -724,6 +738,46 @@ function copyEmail() {
   });
 }
 
+let customerInsights = [];
+
+async function handleTranscriptUpload(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  const statusEl = document.getElementById('transcriptStatus');
+  const chipsEl = document.getElementById('insightChips');
+  statusEl.textContent = 'Parsing transcript…';
+  statusEl.style.color = 'var(--muted)';
+  chipsEl.style.display = 'none';
+  customerInsights = [];
+
+  try {
+    const text = await file.text();
+    const res = await fetch('/api/parse-transcript', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ transcript: text, companyName: currentResult?.company?.name }),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Parse failed');
+    customerInsights = data.insights || [];
+    if (customerInsights.length) {
+      statusEl.textContent = `✓ ${customerInsights.length} customer insights extracted`;
+      statusEl.style.color = 'var(--green)';
+      chipsEl.style.display = 'flex';
+      chipsEl.innerHTML = customerInsights.map(s =>
+        `<span style="background:var(--surface2);border:1px solid var(--border);border-radius:20px;padding:3px 10px;font-size:0.75rem;color:var(--text)">${esc(s)}</span>`
+      ).join('');
+    } else {
+      statusEl.textContent = 'No clear insights found — try a different transcript';
+      statusEl.style.color = 'var(--yellow)';
+    }
+  } catch (e) {
+    statusEl.textContent = 'Failed: ' + e.message;
+    statusEl.style.color = 'var(--red)';
+  }
+  event.target.value = '';
+}
+
 function copyResearchEmail() {
   const body = document.getElementById('researchBody').value;
   navigator.clipboard.writeText(body).then(() => {
@@ -761,6 +815,7 @@ async function generateResearchEmail() {
         employees: company?.employees,
         ceoName: ceo?.name,
         ceoFirstName: ceo?.firstName,
+        customerInsights: customerInsights.length ? customerInsights : undefined,
       }),
     });
     const data = await res.json();
