@@ -434,7 +434,7 @@ async function launchEmailOutreach({ companyData, ceoData, emailSequence, apiKey
 
       // Persist IDs so the Apollo reply webhook can flip status to Connected
       if (listResult?.priorityFieldValueId && listResult?.connectedOptionId && companyData?.domain) {
-        tracker.saveTracking(companyData.domain, {
+        await tracker.saveTracking(companyData.domain, {
           priorityFieldValueId: listResult.priorityFieldValueId,
           connectedOptionId: listResult.connectedOptionId,
           orgId: org.id,
@@ -451,13 +451,18 @@ async function launchEmailOutreach({ companyData, ceoData, emailSequence, apiKey
   // Log outreach date for follow-up reminders
   const cleanDomain = companyData?.domain ? companyData.domain.toLowerCase().replace(/^www\./, '') : null;
   if (cleanDomain) {
-    tracker.logOutreach(cleanDomain, {
-      ceoName: ceoData?.name || `${ceoData?.firstName || ''} ${ceoData?.lastName || ''}`.trim() || null,
-      ceoEmail: ceoData?.email || null,
-      companyName: companyData?.name || null,
-      industry: companyData?.industry || null,
-      description: companyData?.description || null,
-    });
+    try {
+      await tracker.logOutreach(cleanDomain, {
+        ceoName: ceoData?.name || `${ceoData?.firstName || ''} ${ceoData?.lastName || ''}`.trim() || null,
+        ceoEmail: ceoData?.email || null,
+        companyName: companyData?.name || null,
+        industry: companyData?.industry || null,
+        description: companyData?.description || null,
+      });
+    } catch (e) {
+      console.error('[tracker] logOutreach failed:', e.message);
+      results.errors.push(`Outreach log: ${e.message}`);
+    }
   }
 
   return {

@@ -1267,11 +1267,12 @@ async function loadDatabase() {
   body.innerHTML = `<div style="color:var(--muted);text-align:center;padding:40px">Loading…</div>`;
   try {
     const res = await fetch('/api/outreach-log');
-    _allOutreach = await res.json();
+    const data = await res.json();
+    _allOutreach = Array.isArray(data) ? data : [];
     renderStats(_allOutreach);
     renderDatabase(_allOutreach);
   } catch(e) {
-    body.innerHTML = `<div style="color:var(--muted);text-align:center;padding:40px">Failed to load</div>`;
+    body.innerHTML = `<div style="color:var(--muted);text-align:center;padding:40px">Failed to load outreach data</div>`;
   }
 }
 

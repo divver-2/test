@@ -38,9 +38,7 @@ app.post('/api/send-outreach', async (req, res) => {
   const { companyData, ceoData, emailSequence, apiKey: bodyKey, affinityKey: bodyAffinityKey, senderName } = req.body;
   if (!ceoData?.email) return res.status(400).json({ error: 'ceoData.email is required' });
 
-  const apiKey = bodyKey || process.env.APOLLO_API_KEY;
-  if (!apiKey) return res.status(400).json({ error: 'Apollo API key is required' });
-
+  const apiKey = bodyKey || process.env.APOLLO_API_KEY || '';
   const affinityKey = bodyAffinityKey || process.env.AFFINITY_API_KEY;
 
   try {
