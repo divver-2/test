@@ -1313,19 +1313,30 @@ function renderDatabase(items) {
   const rest = items.filter(r => !due.includes(r));
 
   function row(item, highlight) {
-    const days = item.sentAt ? Math.floor((now - new Date(item.sentAt).getTime()) / 86400000) : null;
+    const lastDate = item.followUpSentAt || item.sentAt;
+    const daysSinceLast = lastDate ? Math.floor((now - new Date(lastDate).getTime()) / 86400000) : null;
+    const followUpCount = item.followUpSentAt ? 1 : 0;
+    const sentDateStr = item.sentAt ? new Date(item.sentAt).toLocaleDateString('en-US', { month:'short', day:'numeric', year:'numeric' }) : '—';
     const emailHref = item.ceoEmail ? `mailto:${item.ceoEmail}` : null;
     const border = highlight ? 'border-left:3px solid var(--yellow)' : item.followUpSentAt ? 'border-left:3px solid var(--green)' : 'border-left:3px solid transparent';
     return `<div style="display:flex;align-items:center;gap:16px;background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:14px 18px;${border}">
       <div style="flex:1;min-width:0">
         <div style="font-weight:600;font-size:0.92rem">${esc(item.companyName || item.domain)}</div>
-        <div style="font-size:0.82rem;color:var(--muted);margin-top:3px">${esc(item.ceoName || '—')}</div>
+        <div style="font-size:0.82rem;color:var(--muted);margin-top:3px">${esc(item.ceoName || '—')}${item.ceoEmail ? ` · <a href="mailto:${esc(item.ceoEmail)}" style="color:var(--accent);text-decoration:none">${esc(item.ceoEmail)}</a>` : ''}</div>
       </div>
-      <div style="flex-shrink:0;text-align:right">
-        ${emailHref
-          ? `<a href="${emailHref}" style="font-size:0.83rem;color:var(--accent);text-decoration:none;font-weight:500">${esc(item.ceoEmail)}</a>`
-          : `<span style="font-size:0.82rem;color:var(--muted)">No email</span>`}
-        <div style="font-size:0.73rem;color:var(--muted);margin-top:3px">${days !== null ? 'Sent ' + days + 'd ago' : ''}</div>
+      <div style="display:flex;gap:24px;flex-shrink:0;text-align:right">
+        <div>
+          <div style="font-size:0.73rem;color:var(--muted);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:2px">Sent</div>
+          <div style="font-size:0.83rem;font-weight:500">${sentDateStr}</div>
+        </div>
+        <div>
+          <div style="font-size:0.73rem;color:var(--muted);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:2px">Follow-ups</div>
+          <div style="font-size:0.83rem;font-weight:500">${followUpCount}</div>
+        </div>
+        <div>
+          <div style="font-size:0.73rem;color:var(--muted);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:2px">Last email</div>
+          <div style="font-size:0.83rem;font-weight:500">${daysSinceLast !== null ? daysSinceLast + 'd ago' : '—'}</div>
+        </div>
       </div>
     </div>`;
   }
