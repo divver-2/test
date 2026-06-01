@@ -451,15 +451,22 @@ Company context:
 NewView Capital portfolio (pick 1-2 most relevant/adjacent companies to reference):
 ${NEWVIEW_PORTFOLIO.join(', ')}
 
-Write an email with this exact structure:
-Line 1: "Hi ${firstName},"
-Line 2 (blank line then): "Hope all is well, I'm an investor at NewView Capital - a $3.1bn venture growth fund."
-Paragraph: 2-3 sentences showing deep research — name 2-3 specific competitors and explain exactly how ${companyName} differentiates (be specific, not generic).
-Paragraph: 1-2 sentences referencing the 1-2 most relevant NewView portfolio companies and why that makes NewView a natural partner for ${companyName}.
-Line: "I'm excited about what you are building and wanted to see if it was a good time to connect."
-Sign off: "Thanks," then new line "David"
+Write a concise investor outreach email with this exact structure — keep the same tight, warm tone as a cold outreach, not a research report:
 
-Reply with only the email body. Be specific and research-backed, not generic.`,
+"Hi ${firstName},"
+[blank line]
+"Hope all is well, I'm an investor at NewView Capital - a $3.1bn venture growth fund."
+[blank line]
+One sentence on what specifically makes ${companyName} differentiated — name 1-2 direct competitors and call out the specific technical or go-to-market edge ${companyName} has over them. Be concrete, not generic.
+[blank line]
+One paragraph (2-3 sentences) building out NewView's thesis in this space: mention that we've spent a lot of time investing in [the specific space ${companyName} operates in], reference the 1-2 most relevant NewView portfolio companies by name, and say we have a thesis around why this category is important.
+[blank line]
+"We would love to find a way to partner together and wanted to see if it was a good time to connect."
+[blank line]
+"Thanks,"
+"David"
+
+Reply with only the email body. Keep it tight — this is a cold outreach, not an essay.`,
       }],
     });
     res.json({ body: msg.content[0].text.trim() });
