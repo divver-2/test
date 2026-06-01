@@ -530,20 +530,22 @@ Reply with only the email body. Keep it tight — 3 paragraphs only.`,
 });
 
 // Get full outreach log (all Mark as Sent entries)
-app.get('/api/outreach-log', (req, res) => {
-  res.json(tracker.getAllOutreach());
+app.get('/api/outreach-log', async (req, res) => {
+  try { res.json(await tracker.getAllOutreach()); }
+  catch(e) { res.status(500).json({ error: e.message }); }
 });
 
 // Get all follow-ups due (outreach sent 30+ days ago, no follow-up yet)
-app.get('/api/follow-ups', (req, res) => {
-  res.json(tracker.getFollowUpsDue());
+app.get('/api/follow-ups', async (req, res) => {
+  try { res.json(await tracker.getFollowUpsDue()); }
+  catch(e) { res.status(500).json({ error: e.message }); }
 });
 
 // Mark a follow-up as sent
-app.post('/api/follow-ups/mark-sent', (req, res) => {
+app.post('/api/follow-ups/mark-sent', async (req, res) => {
   const { domain } = req.body;
   if (!domain) return res.status(400).json({ error: 'domain required' });
-  tracker.markFollowUpSent(domain);
+  await tracker.markFollowUpSent(domain);
   res.json({ ok: true });
 });
 

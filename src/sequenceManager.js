@@ -398,15 +398,13 @@ async function launchEmailOutreach({ companyData, ceoData, emailSequence, apiKey
   if (affinityKey && (companyData?.name || companyData?.domain)) {
     try {
       const orgName = companyData.name || companyData.domain;
-      // Check learned cache first — skips search entirely for known domains
       const cleanDomain = companyData?.domain ? companyData.domain.toLowerCase().replace(/^www\./, '') : null;
-      const cachedOrgId = companyData?.affinityOrgId || tracker.getCachedOrgId(cleanDomain);
+      const cachedOrgId = companyData?.affinityOrgId || await tracker.getCachedOrgId(cleanDomain);
       const { org, created } = await affinity.upsertOrganization(
         { name: orgName, domain: cleanDomain, affinityOrgId: cachedOrgId, ceoEmail: ceoData?.email, ceoFirstName: ceoData?.firstName, ceoLastName: ceoData?.lastName },
         affinityKey
       );
-      // Only cache when found via reliable method (not name-only fallback which can return wrong org)
-      if (org && cleanDomain && !created?.foundByNameOnly) tracker.learnOrgId(cleanDomain, org.id);
+      if (org && cleanDomain && !created?.foundByNameOnly) await tracker.learnOrgId(cleanDomain, org.id);
       if (!org) {
         console.log('[Affinity] org not found in Affinity — skipping sourcing list sync');
         results.affinity = { orgId: null, addedToList: false, chasingSet: false, notFound: true };
