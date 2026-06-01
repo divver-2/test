@@ -388,72 +388,11 @@ async function runOutreachByCompany({ companyName, apiKey, affinityKey }) {
   };
 }
 
-// Launch full email outreach: create Apollo CRM records, build sequence with steps, enroll contact
+// Log outreach and sync to Affinity — no Apollo sequencing
 async function launchEmailOutreach({ companyData, ceoData, emailSequence, apiKey, affinityKey: passedAffinityKey, senderName }) {
-  const results = { contact: null, account: null, sequence: null, enrolled: false, affinity: null, errors: [] };
+  const results = { enrolled: true, affinity: null, errors: [] };
 
-  // 1+2+4. Get email accounts, upsert Apollo account, and find sequence — all in parallel
-  let emailAccountId = null;
-  await Promise.all([
-    apollo.getEmailAccounts(apiKey).then(accounts => {
-      emailAccountId = accounts[0]?.id || null;
-    }).catch(e => {
-      results.errors.push(`Email accounts: ${e.response?.data?.message || e.message}`);
-    }),
-    companyData?.name ? apollo.upsertAccount(companyData, apiKey).then(acct => {
-      results.account = acct;
-    }).catch(e => {
-      results.errors.push(`Account: ${e.response?.data?.message || e.message}`);
-    }) : Promise.resolve(),
-    apollo.searchSequences(SEQUENCE_NAME, apiKey).then(seqs => {
-      const existing = seqs.filter(s => s.name === SEQUENCE_NAME);
-      if (existing.length === 0) throw new Error(`Sequence "${SEQUENCE_NAME}" not found in Apollo`);
-      results.sequence = existing[0];
-      console.log('[launchEmailOutreach] Found sequence:', results.sequence.id, results.sequence.name);
-    }).catch(e => {
-      results.errors.push(`Sequence: ${e.response?.data?.message || e.message}`);
-    }),
-  ]);
-
-  if (!emailAccountId) {
-    results.errors.push('No connected email account found in Apollo — connect an inbox in Apollo Settings first.');
-    return { success: false, ...results };
-  }
-
-  // 3. Upsert contact
-  if (!ceoData?.email) {
-    results.errors.push('CEO email is required to send outreach.');
-    return { success: false, ...results };
-  }
-
-  try {
-    const { contact } = await apollo.upsertContact({
-      first_name: ceoData.firstName,
-      last_name: ceoData.lastName,
-      email: ceoData.email,
-      title: ceoData.title,
-      organization_name: companyData?.name,
-      account_id: results.account?.id,
-    }, apiKey);
-    results.contact = contact;
-  } catch (e) {
-    results.errors.push(`Contact: ${e.response?.data?.message || e.message}`);
-    return { success: false, ...results };
-  }
-
-  if (!results.sequence) return { success: false, ...results };
-
-  // 5. Enroll contact in sequence — Apollo auto-runs from step 1
-  try {
-    console.log('[launchEmailOutreach] Enrolling — sequenceId:', results.sequence.id, 'contactId:', results.contact.id, 'emailAccountId:', emailAccountId);
-    await apollo.addContactToSequence(results.sequence.id, results.contact.id, emailAccountId, apiKey);
-    results.enrolled = true;
-  } catch (e) {
-    console.error('[launchEmailOutreach] Enrollment error — status:', e.response?.status, 'data:', JSON.stringify(e.response?.data));
-    results.errors.push(`Enrollment: ${e.response?.data?.message || e.message}`);
-  }
-
-  // 6. Sync to Affinity
+  // Sync to Affinity
   const affinityKey = passedAffinityKey || process.env.AFFINITY_API_KEY;
   console.log('[Affinity] launchEmailOutreach — affinityKey set:', !!affinityKey, '| companyData.name:', companyData?.name, '| companyData.domain:', companyData?.domain);
   if (affinityKey && (companyData?.name || companyData?.domain)) {
@@ -511,12 +450,21 @@ async function launchEmailOutreach({ companyData, ceoData, emailSequence, apiKey
     }
   }
 
+  // Log outreach date for follow-up reminders
+  const cleanDomain = companyData?.domain ? companyData.domain.toLowerCase().replace(/^www\./, '') : null;
+  if (cleanDomain) {
+    tracker.logOutreach(cleanDomain, {
+      ceoName: ceoData?.name || `${ceoData?.firstName || ''} ${ceoData?.lastName || ''}`.trim() || null,
+      ceoEmail: ceoData?.email || null,
+      companyName: companyData?.name || null,
+      industry: companyData?.industry || null,
+      description: companyData?.description || null,
+    });
+  }
+
   return {
-    success: results.enrolled,
-    sequenceId: results.sequence?.id,
-    sequenceName: results.sequence?.name,
-    contactId: results.contact?.id,
-    enrolled: results.enrolled,
+    success: true,
+    enrolled: true,
     affinity: results.affinity,
     errors: results.errors,
   };

@@ -529,6 +529,63 @@ Reply with only the email body. Keep it tight — 3 paragraphs only.`,
   }
 });
 
+// Get all follow-ups due (outreach sent 30+ days ago, no follow-up yet)
+app.get('/api/follow-ups', (req, res) => {
+  res.json(tracker.getFollowUpsDue());
+});
+
+// Mark a follow-up as sent
+app.post('/api/follow-ups/mark-sent', (req, res) => {
+  const { domain } = req.body;
+  if (!domain) return res.status(400).json({ error: 'domain required' });
+  tracker.markFollowUpSent(domain);
+  res.json({ ok: true });
+});
+
+// Generate a follow-up email draft for a company
+app.post('/api/follow-up-draft', async (req, res) => {
+  const { ceoName, ceoEmail, companyName, industry, description, daysSince } = req.body;
+  const anthropicKey = process.env.ANTHROPIC_API_KEY;
+  if (!anthropicKey) return res.status(400).json({ error: 'ANTHROPIC_API_KEY not configured' });
+
+  try {
+    const client = new Anthropic({ apiKey: anthropicKey });
+    const firstName = (ceoName || '').split(' ')[0] || 'there';
+    const msg = await client.messages.create({
+      model: 'claude-sonnet-4-6',
+      max_tokens: 300,
+      messages: [{
+        role: 'user',
+        content: `You are David Divver, a partner at NewView Capital. Write a short, warm follow-up email to ${ceoName} (CEO of ${companyName}) sent ${daysSince} days after the initial outreach.
+
+Company: ${companyName}
+Industry: ${industry || ''}
+Description: ${description || ''}
+
+Structure:
+"Hi ${firstName},"
+[blank line]
+One sentence: a warm, brief follow-up — mention you wanted to resurface your note from a few weeks ago and reiterate your interest in ${companyName}.
+[blank line]
+One sentence: "Would you be open to a quick call to connect?"
+[blank line]
+"Thanks,"
+"David"
+
+Reply with only the email. Keep it to 3-4 lines — short and direct.`,
+      }],
+    });
+    res.json({
+      subject: `Following up - NewView Capital`,
+      body: msg.content[0].text.trim().replace(/—/g, '-'),
+      to: ceoEmail,
+    });
+  } catch (err) {
+    console.error('[/api/follow-up-draft] Error:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // Clear cached org ID for a domain (use when Affinity org was deleted/changed)
 app.post('/api/cache/clear', (req, res) => {
   const { domain } = req.body;

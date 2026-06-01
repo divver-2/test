@@ -496,7 +496,7 @@
       <div class="draft-actions">
         <button class="btn-copy" onclick="copyEmail()">Copy Email</button>
         <a class="btn-mailto" id="mailtoLink" href="#">Open in Email App</a>
-        <button class="btn btn-primary" id="launchBtn" onclick="launchOutreach()" style="padding:8px 18px;font-size:0.85rem">Sequence Launch</button>
+        <button class="btn btn-primary" id="launchBtn" onclick="launchOutreach()" style="padding:8px 18px;font-size:0.85rem">Mark as Sent</button>
       </div>
     </div>
 
@@ -526,6 +526,15 @@
       <button class="btn" id="researchEmailBtn" onclick="generateResearchEmail()" style="font-size:0.82rem;padding:8px 18px;width:100%;background:var(--surface2);border:1px solid var(--border)">✦ Generate Research Email</button>
     </div>
 
+  </div>
+
+  <!-- Follow-ups due -->
+  <div class="card" id="followUpsCard" style="display:none">
+    <div class="history-head">
+      <h2>Follow-ups Due</h2>
+      <span id="followUpsCount" style="font-size:0.75rem;color:var(--yellow);font-weight:600"></span>
+    </div>
+    <div id="followUpsList"></div>
   </div>
 
   <!-- History table -->
@@ -1186,7 +1195,7 @@ async function launchOutreach() {
   btn.disabled = true;
   btn.textContent = 'Launching…';
   const sendStatusEl = document.getElementById('sendStatus');
-  sendStatusEl.innerHTML = `<div style="color:var(--muted);font-size:0.82rem;padding:4px 0">Enrolling in Apollo sequence and syncing to Affinity…</div>`;
+  sendStatusEl.innerHTML = `<div style="color:var(--muted);font-size:0.82rem;padding:4px 0">Logging outreach and syncing to Affinity…</div>`;
 
   try {
     const res = await fetch('/api/send-outreach', {
@@ -1215,8 +1224,8 @@ async function launchOutreach() {
       sendStatusEl.innerHTML = `<div class="send-status send-status-ok" style="margin:0 0 14px">
         <span class="send-status-icon">✅</span>
         <div>
-          <div>Sequence launched in Apollo</div>
-          <div class="send-status-sub">${esc(currentResult.ceo.email)} enrolled — follow-ups will send automatically</div>
+          <div>Outreach logged</div>
+          <div class="send-status-sub">${esc(currentResult.ceo.email)} — follow-up reminder set for 30 days</div>
           ${affLine ? `<div class="send-status-sub" style="margin-top:4px">${affLine}</div>` : ''}
         </div>
       </div>`;
@@ -1245,6 +1254,91 @@ document.getElementById('companyInput').addEventListener('keydown', e => {
   if (e.key === 'Enter') addCompany();
 });
 renderHistory();
+loadFollowUps();
+
+async function loadFollowUps() {
+  try {
+    const res = await fetch('/api/follow-ups');
+    const items = await res.json();
+    const card = document.getElementById('followUpsCard');
+    const list = document.getElementById('followUpsList');
+    const count = document.getElementById('followUpsCount');
+    if (!items.length) { card.style.display = 'none'; return; }
+    card.style.display = 'block';
+    count.textContent = `${items.length} pending`;
+    list.innerHTML = items.map(item => {
+      const days = Math.floor((Date.now() - new Date(item.sentAt).getTime()) / 86400000);
+      return `<div id="fu-${item.domain}" style="display:flex;flex-direction:column;gap:10px;padding:14px 0;border-bottom:1px solid var(--border)">
+        <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px">
+          <div>
+            <span style="font-weight:600;font-size:0.9rem">${esc(item.companyName || item.domain)}</span>
+            <span style="color:var(--muted);font-size:0.8rem;margin-left:8px">${esc(item.ceoName || '')} · ${days} days ago</span>
+          </div>
+          <div style="display:flex;gap:8px">
+            <button class="btn" style="font-size:0.78rem;padding:5px 12px" onclick="draftFollowUp('${esc(item.domain)}', this)">Draft Follow-up</button>
+            <button class="btn" style="font-size:0.78rem;padding:5px 12px;color:var(--muted)" onclick="dismissFollowUp('${esc(item.domain)}')">Dismiss</button>
+          </div>
+        </div>
+        <div id="fu-draft-${item.domain}" style="display:none;flex-direction:column;gap:8px">
+          <textarea style="width:100%;min-height:140px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:10px 13px;color:var(--text);font-size:0.85rem;resize:vertical" id="fu-body-${item.domain}"></textarea>
+          <div style="display:flex;gap:8px">
+            <button class="btn" style="font-size:0.78rem;padding:5px 12px" onclick="copyFollowUp('${esc(item.domain)}')">Copy</button>
+            ${item.ceoEmail ? `<a class="btn" style="font-size:0.78rem;padding:5px 12px;text-decoration:none" id="fu-mailto-${item.domain}" href="#">Open in Email App</a>` : ''}
+            <button class="btn" style="font-size:0.78rem;padding:5px 12px;color:var(--green)" onclick="markFollowUpSent('${esc(item.domain)}')">Mark as Sent</button>
+          </div>
+        </div>
+      </div>`;
+    }).join('');
+    // Store item data for draft generation
+    window._followUpData = {};
+    items.forEach(item => { window._followUpData[item.domain] = item; });
+  } catch(e) { console.log('Follow-ups load error:', e.message); }
+}
+
+async function draftFollowUp(domain, btn) {
+  const item = window._followUpData?.[domain];
+  if (!item) return;
+  btn.disabled = true; btn.textContent = 'Drafting…';
+  const days = Math.floor((Date.now() - new Date(item.sentAt).getTime()) / 86400000);
+  try {
+    const res = await fetch('/api/follow-up-draft', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ceoName: item.ceoName, ceoEmail: item.ceoEmail, companyName: item.companyName, industry: item.industry, description: item.description, daysSince: days }),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error);
+    const draftEl = document.getElementById(`fu-draft-${domain}`);
+    const bodyEl = document.getElementById(`fu-body-${domain}`);
+    const mailtoEl = document.getElementById(`fu-mailto-${domain}`);
+    bodyEl.value = data.body;
+    if (mailtoEl && item.ceoEmail) {
+      mailtoEl.href = `mailto:${item.ceoEmail}?subject=${encodeURIComponent(data.subject)}&body=${encodeURIComponent(data.body)}`;
+    }
+    draftEl.style.display = 'flex';
+  } catch(e) { setStatus('Follow-up draft failed: ' + e.message, 'error'); }
+  finally { btn.disabled = false; btn.textContent = 'Regenerate'; }
+}
+
+function copyFollowUp(domain) {
+  const body = document.getElementById(`fu-body-${domain}`)?.value || '';
+  navigator.clipboard.writeText(body).then(() => {
+    const btn = document.querySelector(`#fu-${domain} .btn`);
+    const prev = btn?.textContent;
+    if (btn) { btn.textContent = 'Copied!'; setTimeout(() => btn.textContent = prev, 2000); }
+  });
+}
+
+async function markFollowUpSent(domain) {
+  await fetch('/api/follow-ups/mark-sent', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ domain }) });
+  document.getElementById(`fu-${domain}`)?.remove();
+  const remaining = document.querySelectorAll('[id^="fu-"]').length;
+  if (!remaining) document.getElementById('followUpsCard').style.display = 'none';
+}
+
+async function dismissFollowUp(domain) {
+  await markFollowUpSent(domain);
+}
 </script>
 </body>
 </html>
