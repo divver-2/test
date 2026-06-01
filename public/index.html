@@ -577,10 +577,10 @@
   </div>
 
   <!-- Stats bar -->
-  <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:20px" id="dbStats"></div>
+  <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:28px" id="dbStats"></div>
 
-  <!-- Rows -->
-  <div id="databaseBody" style="display:flex;flex-direction:column;gap:8px"></div>
+  <!-- Follow-ups due -->
+  <div id="databaseBody"></div>
 
 </div>
 
@@ -1309,29 +1309,37 @@ function renderDatabase(items) {
     return;
   }
   const now = Date.now();
-  body.innerHTML = items.map(item => {
+  const due = items.filter(r => !r.followUpSentAt && r.sentAt && (now - new Date(r.sentAt).getTime()) >= 30*86400000);
+  const rest = items.filter(r => !due.includes(r));
+
+  function row(item, highlight) {
     const days = item.sentAt ? Math.floor((now - new Date(item.sentAt).getTime()) / 86400000) : null;
-    const due = days !== null && days >= 30 && !item.followUpSentAt;
-    const initial = (item.companyName || item.domain || '?')[0].toUpperCase();
-    const statusBadge = item.followUpSentAt
-      ? `<span style="background:rgba(16,185,129,0.12);color:var(--green);border:1px solid rgba(16,185,129,0.25);border-radius:20px;padding:3px 10px;font-size:0.73rem;font-weight:600">✓ Followed up</span>`
-      : due
-      ? `<span style="background:rgba(245,158,11,0.1);color:var(--yellow);border:1px solid rgba(245,158,11,0.3);border-radius:20px;padding:3px 10px;font-size:0.73rem;font-weight:600">⚠ Follow-up due</span>`
-      : `<span style="background:var(--surface2);color:var(--muted);border:1px solid var(--border);border-radius:20px;padding:3px 10px;font-size:0.73rem">In ${30 - days}d</span>`;
-    const rowBorder = due ? 'border-left:3px solid var(--yellow)' : item.followUpSentAt ? 'border-left:3px solid var(--green)' : 'border-left:3px solid transparent';
-    return `<div style="display:flex;align-items:center;gap:16px;background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:14px 18px;${rowBorder}">
-      <div style="width:38px;height:38px;border-radius:9px;background:var(--surface2);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:0.95rem;flex-shrink:0">${esc(initial)}</div>
+    const emailHref = item.ceoEmail ? `mailto:${item.ceoEmail}` : null;
+    const border = highlight ? 'border-left:3px solid var(--yellow)' : item.followUpSentAt ? 'border-left:3px solid var(--green)' : 'border-left:3px solid transparent';
+    return `<div style="display:flex;align-items:center;gap:16px;background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:14px 18px;${border}">
       <div style="flex:1;min-width:0">
-        <div style="font-weight:600;font-size:0.9rem">${esc(item.companyName || item.domain)}</div>
-        <div style="font-size:0.78rem;color:var(--muted);margin-top:2px">${esc(item.ceoName || '')}${item.ceoEmail ? ' · ' + esc(item.ceoEmail) : ''}</div>
+        <div style="font-weight:600;font-size:0.92rem">${esc(item.companyName || item.domain)}</div>
+        <div style="font-size:0.82rem;color:var(--muted);margin-top:3px">${esc(item.ceoName || '—')}</div>
       </div>
-      <div style="text-align:right;flex-shrink:0">
-        <div style="font-size:0.78rem;color:var(--muted)">${fmtDate(item.sentAt)}</div>
-        <div style="font-size:0.73rem;color:var(--muted);margin-top:2px">${days !== null ? days + ' days ago' : ''}</div>
+      <div style="flex-shrink:0;text-align:right">
+        ${emailHref
+          ? `<a href="${emailHref}" style="font-size:0.83rem;color:var(--accent);text-decoration:none;font-weight:500">${esc(item.ceoEmail)}</a>`
+          : `<span style="font-size:0.82rem;color:var(--muted)">No email</span>`}
+        <div style="font-size:0.73rem;color:var(--muted);margin-top:3px">${days !== null ? 'Sent ' + days + 'd ago' : ''}</div>
       </div>
-      <div style="flex-shrink:0">${statusBadge}</div>
     </div>`;
-  }).join('');
+  }
+
+  let html = '';
+  if (due.length) {
+    html += `<div style="font-size:0.75rem;font-weight:700;text-transform:uppercase;letter-spacing:0.07em;color:var(--yellow);margin-bottom:10px">Follow-ups Due (${due.length})</div>`;
+    html += `<div style="display:flex;flex-direction:column;gap:8px;margin-bottom:28px">${due.map(i => row(i, true)).join('')}</div>`;
+  }
+  if (rest.length) {
+    html += `<div style="font-size:0.75rem;font-weight:700;text-transform:uppercase;letter-spacing:0.07em;color:var(--muted);margin-bottom:10px">All Outreach</div>`;
+    html += `<div style="display:flex;flex-direction:column;gap:8px">${rest.map(i => row(i, false)).join('')}</div>`;
+  }
+  body.innerHTML = html;
 }
 
 async function loadFollowUps() {
