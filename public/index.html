@@ -517,13 +517,13 @@
       <!-- Transcript upload -->
       <div id="transcriptArea" style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
         <input type="file" id="transcriptFile" accept=".pdf,.txt,.md" multiple style="display:none" onchange="handleTranscriptUpload(event)" />
-        <button class="btn" onclick="document.getElementById('transcriptFile').click()" style="font-size:0.82rem;padding:8px 18px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;font-weight:600">⬆ Upload Documents</button>
+        <button class="btn" onclick="document.getElementById('transcriptFile').click()" style="font-size:0.82rem;padding:8px 18px;background:var(--surface2);border:1px solid rgba(255,255,255,0.2);border-radius:8px;font-weight:600;color:#fff">⬆ Upload Documents</button>
         <span id="transcriptStatus" style="font-size:0.78rem;color:var(--muted)">Up to 5 — adds customer voice to differentiation</span>
       </div>
       <!-- Insights chips -->
       <div id="insightChips" style="display:none;flex-wrap:wrap;gap:6px"></div>
       <!-- Generate button -->
-      <button class="btn" id="researchEmailBtn" onclick="generateResearchEmail()" style="font-size:0.82rem;padding:8px 18px;width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:8px;font-weight:600">✦ Generate Research Email</button>
+      <button class="btn" id="researchEmailBtn" onclick="generateResearchEmail()" style="font-size:0.82rem;padding:8px 18px;width:100%;background:var(--surface2);border:1px solid rgba(255,255,255,0.2);border-radius:8px;font-weight:600;color:#fff">✦ Generate Research Email</button>
     </div>
 
   </div>
@@ -537,10 +537,10 @@
     <div id="followUpsList"></div>
   </div>
 
-  <!-- History table -->
+  <!-- Outreach log -->
   <div class="card">
     <div class="history-head">
-      <h2>Recent Companies</h2>
+      <h2>Outreach Log</h2>
     </div>
     <div class="table-wrap">
       <table>
@@ -548,15 +548,12 @@
           <tr>
             <th>Company</th>
             <th>CEO</th>
-            <th>Email</th>
-            <th>Industry</th>
-            <th>Funding</th>
-            <th>Affinity Owner</th>
-            <th>Status</th>
-            <th>Added</th>
+            <th>Sent</th>
+            <th>Days Since</th>
+            <th>Follow-up</th>
           </tr>
         </thead>
-        <tbody id="historyBody"></tbody>
+        <tbody id="outreachLogBody"><tr><td colspan="5" style="color:var(--muted);text-align:center;padding:20px">No outreach logged yet — click Mark as Sent after sending an email</td></tr></tbody>
       </table>
     </div>
   </div>
@@ -659,7 +656,7 @@ async function addCompany() {
     };
     history.push(entry);
     localStorage.setItem('outreach_history', JSON.stringify(history));
-    renderHistory();
+    loadOutreachLog();
 
     clearStatus();
     document.getElementById('companyInput').value = '';
@@ -1100,71 +1097,34 @@ function renderResult(data) {
 }
 
 // ── Render history table ──────────────────────────────────
-function renderHistory() {
-  const tbody = document.getElementById('historyBody');
-
-  if (!history.length) {
-    tbody.innerHTML = `<tr><td colspan="8"><div class="empty"><span>🏢</span>No companies added yet.<br>Search above to get started.</div></td></tr>`;
-    return;
-  }
-
-  tbody.innerHTML = history.slice(-5).reverse().map((h) => {
-    const init = (h.company || '?')[0].toUpperCase();
-    const logoHtml = h.logo
-      ? `<img src="${esc(h.logo)}" onerror="this.parentElement.textContent='${init}'" />`
-      : init;
-    return `
-      <tr>
-        <td>
-          <div class="td-co">
-            <div class="td-sm-logo">${logoHtml}</div>
-            <div>
-              <div class="td-co-name">${esc(h.company || '—')}</div>
-              <div class="td-co-domain">${esc(h.domain || '')}</div>
-            </div>
-          </div>
-        </td>
-        <td>${esc(h.ceoName || '—')}</td>
-        <td class="td-email">${esc(h.ceoEmail || '—')}</td>
-        <td><span style="color:var(--muted);font-size:0.8rem">${esc(cap(h.industry || '—'))}</span></td>
-        <td>${h.funding ? `<span class="badge badge-accent">$${esc(h.funding)}</span>` : '<span style="color:var(--muted)">—</span>'}</td>
-        <td>${(h.affinityOwners?.length ? h.affinityOwners : (h.affinityOwner ? [h.affinityOwner] : [])).map(o => `<span class="badge badge-accent" style="margin-right:3px">${esc(o)}</span>`).join('') || '<span style="color:var(--muted)">—</span>'}</td>
-        <td>${(h.affinityOwners?.length || h.affinityOwner)
-          ? '<span class="badge badge-yellow">⚠ Confirm first</span>'
-          : '<span class="badge badge-green">✓ OK to send</span>'}</td>
-        <td class="td-date">${fmtDate(h.addedAt)}</td>
-      </tr>`;
-  }).join('');
-}
-
-// ── Mark Connected ────────────────────────────────────────
-async function markConnected(historyIdx) {
-  const entry = history[historyIdx];
-  if (!entry) return;
-
-  const btn = event.target;
-  btn.disabled = true;
-  btn.textContent = 'Updating…';
-
+async function loadOutreachLog() {
+  const tbody = document.getElementById('outreachLogBody');
   try {
-    const res = await fetch('/api/affinity/mark-connected', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        priorityFieldValueId: entry.priorityFieldValueId,
-        connectedOptionId: entry.connectedOptionId,
-      }),
-    });
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.error || 'Failed');
-
-    history[historyIdx].affinityConnected = true;
-    localStorage.setItem('outreach_history', JSON.stringify(history));
-    renderHistory();
+    const res = await fetch('/api/outreach-log');
+    const items = await res.json();
+    if (!items.length) {
+      tbody.innerHTML = `<tr><td colspan="5" style="color:var(--muted);text-align:center;padding:20px">No outreach logged yet — click Mark as Sent after sending an email</td></tr>`;
+      return;
+    }
+    const now = Date.now();
+    tbody.innerHTML = items.map(item => {
+      const days = Math.floor((now - new Date(item.sentAt).getTime()) / 86400000);
+      const followUpDue = !item.followUpSentAt && days >= 30;
+      const followUpStatus = item.followUpSentAt
+        ? `<span class="badge badge-green">✓ Sent</span>`
+        : followUpDue
+        ? `<span class="badge badge-yellow">⚠ Due</span>`
+        : `<span style="color:var(--muted);font-size:0.8rem">In ${30 - days}d</span>`;
+      return `<tr>
+        <td><div class="td-co-name">${esc(item.companyName || item.domain)}</div><div class="td-co-domain">${esc(item.domain)}</div></td>
+        <td>${esc(item.ceoName || '—')}</td>
+        <td class="td-date">${fmtDate(item.sentAt)}</td>
+        <td style="color:var(--muted);font-size:0.85rem">${days}d</td>
+        <td>${followUpStatus}</td>
+      </tr>`;
+    }).join('');
   } catch(e) {
-    btn.disabled = false;
-    btn.textContent = 'Mark Connected';
-    alert('Could not update Affinity: ' + e.message);
+    tbody.innerHTML = `<tr><td colspan="5" style="color:var(--muted);text-align:center;padding:20px">Could not load outreach log</td></tr>`;
   }
 }
 
@@ -1229,7 +1189,9 @@ async function launchOutreach() {
           ${affLine ? `<div class="send-status-sub" style="margin-top:4px">${affLine}</div>` : ''}
         </div>
       </div>`;
-      btn.textContent = 'Launched';
+      btn.textContent = 'Sent ✓';
+      loadOutreachLog();
+      loadFollowUps();
     } else {
       const errs = data.errors?.join(', ') || 'Unknown error';
       sendStatusEl.innerHTML = `<div class="send-status send-status-warn" style="margin:0 0 14px">
@@ -1253,7 +1215,7 @@ async function launchOutreach() {
 document.getElementById('companyInput').addEventListener('keydown', e => {
   if (e.key === 'Enter') addCompany();
 });
-renderHistory();
+loadOutreachLog();
 loadFollowUps();
 
 async function loadFollowUps() {

@@ -529,6 +529,11 @@ Reply with only the email body. Keep it tight — 3 paragraphs only.`,
   }
 });
 
+// Get full outreach log (all Mark as Sent entries)
+app.get('/api/outreach-log', (req, res) => {
+  res.json(tracker.getAllOutreach());
+});
+
 // Get all follow-ups due (outreach sent 30+ days ago, no follow-up yet)
 app.get('/api/follow-ups', (req, res) => {
   res.json(tracker.getFollowUpsDue());

@@ -73,6 +73,15 @@ function getFollowUpsDue() {
     .sort((a, b) => new Date(a.sentAt) - new Date(b.sentAt));
 }
 
+// Return all logged outreach entries sorted newest first
+function getAllOutreach() {
+  const data = load();
+  return Object.entries(data)
+    .filter(([, v]) => v.sentAt)
+    .map(([domain, v]) => ({ domain, ...v }))
+    .sort((a, b) => new Date(b.sentAt) - new Date(a.sentAt));
+}
+
 // Get stored Affinity IDs for a domain
 function getTracking(domain) {
   if (!domain) return null;
@@ -97,4 +106,4 @@ function getCachedOrgId(domain) {
   return getTracking(domain)?.orgId || null;
 }
 
-module.exports = { saveTracking, getTracking, learnOrgId, getCachedOrgId, logOutreach, markFollowUpSent, getFollowUpsDue };
+module.exports = { saveTracking, getTracking, learnOrgId, getCachedOrgId, logOutreach, markFollowUpSent, getFollowUpsDue, getAllOutreach };
