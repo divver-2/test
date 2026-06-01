@@ -422,21 +422,14 @@ const NEWVIEW_PORTFOLIO = [
   'Motion','OneSignal','PlanetScale','Ro','Verse Medical',
 ];
 
-// Parse a customer call transcript and extract differentiation insights
+// Parse a customer call transcript (PDF or text) and extract differentiation insights
 app.post('/api/parse-transcript', async (req, res) => {
-  const { transcript, companyName } = req.body;
-  if (!transcript) return res.status(400).json({ error: 'transcript is required' });
+  const { transcript, pdfBase64, companyName } = req.body;
+  if (!transcript && !pdfBase64) return res.status(400).json({ error: 'transcript or pdfBase64 is required' });
   const anthropicKey = process.env.ANTHROPIC_API_KEY;
   if (!anthropicKey) return res.status(400).json({ error: 'ANTHROPIC_API_KEY not configured' });
 
-  try {
-    const client = new Anthropic({ apiKey: anthropicKey });
-    const msg = await client.messages.create({
-      model: 'claude-sonnet-4-6',
-      max_tokens: 400,
-      messages: [{
-        role: 'user',
-        content: `You are analyzing a customer call transcript for ${companyName || 'a company'}.
+  const prompt = `You are analyzing a customer call transcript for ${companyName || 'a company'}.
 
 Extract 3-5 specific things customers said that highlight why they chose this product and what makes it better than alternatives. Focus on:
 - Specific pain points it solves that competitors don't
@@ -445,11 +438,21 @@ Extract 3-5 specific things customers said that highlight why they chose this pr
 - Quantifiable outcomes or results they mentioned
 
 Return ONLY a JSON array of short strings (each under 20 words), like:
-["insight one", "insight two", "insight three"]
+["insight one", "insight two", "insight three"]`;
 
-Transcript:
-${transcript.slice(0, 8000)}`,
-      }],
+  try {
+    const client = new Anthropic({ apiKey: anthropicKey });
+    const content = pdfBase64
+      ? [
+          { type: 'document', source: { type: 'base64', media_type: 'application/pdf', data: pdfBase64 } },
+          { type: 'text', text: prompt },
+        ]
+      : `${prompt}\n\nTranscript:\n${transcript.slice(0, 8000)}`;
+
+    const msg = await client.messages.create({
+      model: 'claude-sonnet-4-6',
+      max_tokens: 400,
+      messages: [{ role: 'user', content }],
     });
 
     let insights = [];

@@ -516,8 +516,8 @@
     <div style="padding:10px 24px 4px;display:flex;flex-direction:column;gap:8px">
       <!-- Transcript upload -->
       <div id="transcriptArea" style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
-        <input type="file" id="transcriptFile" accept=".txt,.md" style="display:none" onchange="handleTranscriptUpload(event)" />
-        <button class="btn" onclick="document.getElementById('transcriptFile').click()" style="font-size:0.8rem;padding:7px 14px;background:var(--surface2);border:1px solid var(--border)">⬆ Upload Call Transcript</button>
+        <input type="file" id="transcriptFile" accept=".pdf,.txt,.md" style="display:none" onchange="handleTranscriptUpload(event)" />
+        <button class="btn" onclick="document.getElementById('transcriptFile').click()" style="font-size:0.8rem;padding:7px 14px;background:var(--surface2);border:1px solid var(--border)">⬆ Upload Document</button>
         <span id="transcriptStatus" style="font-size:0.78rem;color:var(--muted)">Optional — adds customer voice to differentiation</span>
       </div>
       <!-- Insights chips -->
@@ -751,11 +751,23 @@ async function handleTranscriptUpload(event) {
   customerInsights = [];
 
   try {
-    const text = await file.text();
+    const isPdf = file.type === 'application/pdf' || file.name.endsWith('.pdf');
+    let body;
+    if (isPdf) {
+      const buffer = await file.arrayBuffer();
+      const bytes = new Uint8Array(buffer);
+      let binary = '';
+      for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
+      const pdfBase64 = btoa(binary);
+      body = { pdfBase64, companyName: currentResult?.company?.name };
+    } else {
+      const text = await file.text();
+      body = { transcript: text, companyName: currentResult?.company?.name };
+    }
     const res = await fetch('/api/parse-transcript', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ transcript: text, companyName: currentResult?.company?.name }),
+      body: JSON.stringify(body),
     });
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || 'Parse failed');
