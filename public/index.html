@@ -980,7 +980,7 @@ function renderResult(data) {
   // Reset launch button for new result
   const launchBtn = document.getElementById('launchBtn');
   launchBtn.disabled = false;
-  launchBtn.textContent = 'Sequence Launch';
+  launchBtn.textContent = 'Mark as Sent';
 
   // Logo
   const initial = (company?.name || '?')[0].toUpperCase();
@@ -1245,7 +1245,7 @@ async function launchOutreach() {
   } catch(e) {
     setStatus('Launch error: ' + e.message, 'error');
     btn.disabled = false;
-    btn.textContent = 'Sequence Launch';
+    btn.textContent = 'Mark as Sent';
   }
 }
 
