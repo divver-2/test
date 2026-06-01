@@ -516,9 +516,9 @@
     <div style="padding:10px 24px 4px;display:flex;flex-direction:column;gap:8px">
       <!-- Transcript upload -->
       <div id="transcriptArea" style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
-        <input type="file" id="transcriptFile" accept=".pdf,.txt,.md" style="display:none" onchange="handleTranscriptUpload(event)" />
-        <button class="btn" onclick="document.getElementById('transcriptFile').click()" style="font-size:0.8rem;padding:7px 14px;background:var(--surface2);border:1px solid var(--border)">⬆ Upload Document</button>
-        <span id="transcriptStatus" style="font-size:0.78rem;color:var(--muted)">Optional — adds customer voice to differentiation</span>
+        <input type="file" id="transcriptFile" accept=".pdf,.txt,.md" multiple style="display:none" onchange="handleTranscriptUpload(event)" />
+        <button class="btn" onclick="document.getElementById('transcriptFile').click()" style="font-size:0.8rem;padding:7px 14px;background:var(--surface2);border:1px solid var(--border)">⬆ Upload Documents</button>
+        <span id="transcriptStatus" style="font-size:0.78rem;color:var(--muted)">Up to 3 — adds customer voice to differentiation</span>
       </div>
       <!-- Insights chips -->
       <div id="insightChips" style="display:none;flex-wrap:wrap;gap:6px"></div>
@@ -740,47 +740,51 @@ function copyEmail() {
 
 let customerInsights = [];
 
+async function parseOneFile(file) {
+  const isPdf = file.type === 'application/pdf' || file.name.endsWith('.pdf');
+  let body;
+  if (isPdf) {
+    const buffer = await file.arrayBuffer();
+    const bytes = new Uint8Array(buffer);
+    let binary = '';
+    for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
+    body = { pdfBase64: btoa(binary), companyName: currentResult?.company?.name };
+  } else {
+    body = { transcript: await file.text(), companyName: currentResult?.company?.name };
+  }
+  const res = await fetch('/api/parse-transcript', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || 'Parse failed');
+  return data.insights || [];
+}
+
 async function handleTranscriptUpload(event) {
-  const file = event.target.files[0];
-  if (!file) return;
+  const files = Array.from(event.target.files).slice(0, 3);
+  if (!files.length) return;
   const statusEl = document.getElementById('transcriptStatus');
   const chipsEl = document.getElementById('insightChips');
-  statusEl.textContent = 'Parsing transcript…';
+  statusEl.textContent = `Parsing ${files.length} document${files.length > 1 ? 's' : ''}…`;
   statusEl.style.color = 'var(--muted)';
   chipsEl.style.display = 'none';
   customerInsights = [];
 
   try {
-    const isPdf = file.type === 'application/pdf' || file.name.endsWith('.pdf');
-    let body;
-    if (isPdf) {
-      const buffer = await file.arrayBuffer();
-      const bytes = new Uint8Array(buffer);
-      let binary = '';
-      for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
-      const pdfBase64 = btoa(binary);
-      body = { pdfBase64, companyName: currentResult?.company?.name };
-    } else {
-      const text = await file.text();
-      body = { transcript: text, companyName: currentResult?.company?.name };
-    }
-    const res = await fetch('/api/parse-transcript', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body),
-    });
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.error || 'Parse failed');
-    customerInsights = data.insights || [];
+    const results = await Promise.allSettled(files.map(parseOneFile));
+    const allInsights = results.flatMap(r => r.status === 'fulfilled' ? r.value : []);
+    customerInsights = [...new Set(allInsights)]; // dedupe
     if (customerInsights.length) {
-      statusEl.textContent = `✓ ${customerInsights.length} customer insights extracted`;
+      statusEl.textContent = `✓ ${customerInsights.length} insights from ${files.length} document${files.length > 1 ? 's' : ''}`;
       statusEl.style.color = 'var(--green)';
       chipsEl.style.display = 'flex';
       chipsEl.innerHTML = customerInsights.map(s =>
         `<span style="background:var(--surface2);border:1px solid var(--border);border-radius:20px;padding:3px 10px;font-size:0.75rem;color:var(--text)">${esc(s)}</span>`
       ).join('');
     } else {
-      statusEl.textContent = 'No clear insights found — try a different transcript';
+      statusEl.textContent = 'No clear insights found — try different documents';
       statusEl.style.color = 'var(--yellow)';
     }
   } catch (e) {
