@@ -96,7 +96,7 @@ Reply with only the rewritten email, nothing else.`,
       }],
     });
 
-    res.json({ subject: subject || 'Connecting from NewView Capital', body: msg.content[0].text.trim().replace(/\[([^\]]+)\]/g, '$1') });
+    res.json({ subject: subject || 'Connecting from NewView Capital', body: msg.content[0].text.trim().replace(/\[([^\]]+)\]/g, '$1').replace(/—/g, '-') });
   } catch (err) {
     console.error('[/api/improve-email] Error:', err.message);
     res.status(500).json({ error: err.message });
@@ -524,7 +524,7 @@ ${hasInsights
 Reply with only the email body. Keep it tight.`,
       }],
     });
-    res.json({ body: msg.content[0].text.trim() });
+    res.json({ body: msg.content[0].text.trim().replace(/—/g, '-') });
   } catch (err) {
     console.error('[/api/research-email] Error:', err.message);
     res.status(500).json({ error: err.message });
