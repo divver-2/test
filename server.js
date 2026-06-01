@@ -508,13 +508,13 @@ Write the email with this exact structure — tight and warm, not a research rep
 
 "Hi ${firstName},"
 [blank line]
-"Hope all is well, I'm an investor at NewView Capital - a $3.1bn venture growth fund."
+"Hope all is well, I'm an investor at NewView Capital - a $3.1bn venture growth fund. We've spent a lot of time investing in [the specific space ${companyName} operates in] and have backed companies like [1-2 most relevant NewView portfolio companies]."
 [blank line]
 ${hasInsights
   ? `1-2 sentences on what makes ${companyName} differentiated vs competitors (name 1-2 competitors), then weave in the customer voice naturally — e.g. "We've spoken with customers who specifically highlight [insight] as a key reason they chose ${companyName} over [competitor]."`
   : `One sentence on what specifically makes ${companyName} differentiated — name 1-2 direct competitors and call out the specific edge. Be concrete, not generic.`}
 [blank line]
-2-3 sentences: we've spent a lot of time investing in [the specific space], reference 1-2 relevant NewView portfolio companies, and share a thesis on why this category matters.
+1-2 sentences sharing NewView's thesis on why this category matters and why ${companyName} is well-positioned.
 [blank line]
 "We would love to find a way to partner together and wanted to see if it was a good time to connect."
 [blank line]
