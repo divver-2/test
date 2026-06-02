@@ -376,10 +376,10 @@
 <body>
 
 <!-- Login overlay — shown on first visit until name+email are set -->
-<div id="loginOverlay" style="display:none;position:fixed;inset:0;background:#0a0a0a;z-index:9999;align-items:center;justify-content:center">
-  <div style="background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:40px 44px;width:100%;max-width:400px;box-shadow:0 24px 60px rgba(0,0,0,0.6)">
+<div id="loginOverlay" style="display:none;position:fixed;inset:0;background:#0a0a0a;z-index:9999;align-items:center;justify-content:center;overflow-y:auto;padding:24px 0">
+  <div style="background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:40px 44px;width:100%;max-width:420px;box-shadow:0 24px 60px rgba(0,0,0,0.6)">
     <div style="font-size:1.3rem;font-weight:700;letter-spacing:-0.3px;margin-bottom:6px">Welcome</div>
-    <div style="font-size:0.85rem;color:var(--muted);margin-bottom:28px">Enter your details to get started. This keeps your outreach tracker separate from the rest of the team.</div>
+    <div style="font-size:0.85rem;color:var(--muted);margin-bottom:28px">Set up your account to get started. Your API keys are stored in your browser only.</div>
     <div style="display:flex;flex-direction:column;gap:14px">
       <div class="field">
         <label>Your Name</label>
@@ -388,6 +388,15 @@
       <div class="field">
         <label>Your Email</label>
         <input type="email" id="loginEmailInput" placeholder="e.g. david@nvc.vc" autocomplete="email" style="font-size:0.95rem;padding:10px 14px" />
+      </div>
+      <div style="height:1px;background:var(--border);margin:4px 0"></div>
+      <div class="field">
+        <label>Affinity API Key</label>
+        <input type="password" id="loginAffinityInput" placeholder="Paste your Affinity API key…" autocomplete="off" style="font-size:0.95rem;padding:10px 14px" />
+      </div>
+      <div class="field">
+        <label>Claude API Key</label>
+        <input type="password" id="loginClaudeInput" placeholder="Paste your Anthropic API key…" autocomplete="off" style="font-size:0.95rem;padding:10px 14px" />
       </div>
     </div>
     <button onclick="submitLogin()" class="btn btn-primary" style="width:100%;margin-top:20px;padding:11px;font-size:0.95rem">Get Started →</button>
@@ -433,6 +442,10 @@
       <div class="field">
         <label>Affinity API Key</label>
         <input type="password" id="affinityKeyInput" placeholder="Paste your Affinity API key…" autocomplete="off" />
+      </div>
+      <div class="field">
+        <label>Claude API Key</label>
+        <input type="password" id="claudeKeyInput" placeholder="Paste your Anthropic API key…" autocomplete="off" />
       </div>
     </div>
     <div style="display:flex;gap:8px;margin-top:12px">
@@ -718,9 +731,15 @@ async function addCompany() {
 // ── Settings / API keys ───────────────────────────────────
 function getApiKey()      { return localStorage.getItem('apollo_api_key') || ''; }
 function getAffinityKey() { return localStorage.getItem('affinity_api_key') || ''; }
-function getSenderName()  { return localStorage.getItem('sender_name') || 'David Divver'; }
+function getSenderName()  { return localStorage.getItem('sender_name') || ''; }
 function getUserEmail()   { return localStorage.getItem('user_email') || 'shared'; }
-function userHeaders()    { return { 'Content-Type': 'application/json', 'x-user-email': getUserEmail() }; }
+function getClaudeKey()   { return localStorage.getItem('claude_api_key') || ''; }
+function userHeaders() {
+  const h = { 'Content-Type': 'application/json', 'x-user-email': getUserEmail() };
+  if (getAffinityKey()) h['x-affinity-key'] = getAffinityKey();
+  if (getClaudeKey())   h['x-claude-key']   = getClaudeKey();
+  return h;
+}
 
 function toggleSettings() {
   const panel = document.getElementById('settingsPanel');
@@ -735,23 +754,22 @@ function toggleSettings() {
     document.getElementById('userEmailInput').value = getUserEmail() === 'shared' ? '' : getUserEmail();
     document.getElementById('apolloKeyInput').value = getApiKey();
     document.getElementById('affinityKeyInput').value = getAffinityKey();
-    setTimeout(() => document.getElementById('apolloKeyInput').focus(), 300);
+    document.getElementById('claudeKeyInput').value = getClaudeKey();
+    setTimeout(() => document.getElementById('senderNameInput').focus(), 300);
   }
 }
 
 function saveSettings() {
-  const senderName = document.getElementById('senderNameInput').value.trim();
-  const userEmail  = document.getElementById('userEmailInput').value.trim();
-  const apolloKey  = document.getElementById('apolloKeyInput').value.trim();
+  const senderName  = document.getElementById('senderNameInput').value.trim();
+  const userEmail   = document.getElementById('userEmailInput').value.trim();
+  const apolloKey   = document.getElementById('apolloKeyInput').value.trim();
   const affinityKey = document.getElementById('affinityKeyInput').value.trim();
-  if (senderName) localStorage.setItem('sender_name', senderName);
-  else localStorage.removeItem('sender_name');
-  if (userEmail) localStorage.setItem('user_email', userEmail);
-  else localStorage.removeItem('user_email');
-  if (apolloKey) localStorage.setItem('apollo_api_key', apolloKey);
-  else localStorage.removeItem('apollo_api_key');
-  if (affinityKey) localStorage.setItem('affinity_api_key', affinityKey);
-  else localStorage.removeItem('affinity_api_key');
+  const claudeKey   = document.getElementById('claudeKeyInput').value.trim();
+  if (senderName)   localStorage.setItem('sender_name', senderName);   else localStorage.removeItem('sender_name');
+  if (userEmail)    localStorage.setItem('user_email', userEmail);      else localStorage.removeItem('user_email');
+  if (apolloKey)    localStorage.setItem('apollo_api_key', apolloKey);  else localStorage.removeItem('apollo_api_key');
+  if (affinityKey)  localStorage.setItem('affinity_api_key', affinityKey); else localStorage.removeItem('affinity_api_key');
+  if (claudeKey)    localStorage.setItem('claude_api_key', claudeKey);  else localStorage.removeItem('claude_api_key');
   updatePill(!!apolloKey);
   document.getElementById('settingsPanel').classList.remove('open');
   setStatus('Settings saved.', 'loading');
@@ -1268,13 +1286,17 @@ async function launchOutreach() {
 
 // ── Login ─────────────────────────────────────────────────
 function submitLogin() {
-  const name  = document.getElementById('loginNameInput').value.trim();
-  const email = document.getElementById('loginEmailInput').value.trim();
-  const err   = document.getElementById('loginError');
+  const name        = document.getElementById('loginNameInput').value.trim();
+  const email       = document.getElementById('loginEmailInput').value.trim();
+  const affinityKey = document.getElementById('loginAffinityInput').value.trim();
+  const claudeKey   = document.getElementById('loginClaudeInput').value.trim();
+  const err         = document.getElementById('loginError');
   if (!name || !email || !email.includes('@')) { err.style.display = 'block'; return; }
   err.style.display = 'none';
   localStorage.setItem('sender_name', name);
   localStorage.setItem('user_email', email);
+  if (affinityKey) localStorage.setItem('affinity_api_key', affinityKey);
+  if (claudeKey)   localStorage.setItem('claude_api_key', claudeKey);
   document.getElementById('loginOverlay').style.display = 'none';
   loadOutreachLog();
   loadFollowUps();

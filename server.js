@@ -39,7 +39,7 @@ app.post('/api/send-outreach', async (req, res) => {
   if (!ceoData?.email) return res.status(400).json({ error: 'ceoData.email is required' });
 
   const apiKey = bodyKey || process.env.APOLLO_API_KEY || '';
-  const affinityKey = bodyAffinityKey || process.env.AFFINITY_API_KEY;
+  const affinityKey = req.headers['x-affinity-key'] || bodyAffinityKey || process.env.AFFINITY_API_KEY;
   const userEmail = req.headers['x-user-email'] || 'shared';
 
   try {
@@ -56,7 +56,7 @@ app.post('/api/improve-email', async (req, res) => {
   const { subject, body, instruction, companyName, ceoName, industry } = req.body;
   if (!body || !instruction) return res.status(400).json({ error: 'body and instruction are required' });
 
-  const apiKey = process.env.ANTHROPIC_API_KEY;
+  const apiKey = req.headers['x-claude-key'] || process.env.ANTHROPIC_API_KEY;
   if (!apiKey) return res.status(400).json({ error: 'ANTHROPIC_API_KEY not configured' });
 
   try {
@@ -425,7 +425,7 @@ const NEWVIEW_PORTFOLIO = [
 app.post('/api/parse-transcript', async (req, res) => {
   const { transcript, pdfBase64, companyName } = req.body;
   if (!transcript && !pdfBase64) return res.status(400).json({ error: 'transcript or pdfBase64 is required' });
-  const anthropicKey = process.env.ANTHROPIC_API_KEY;
+  const anthropicKey = req.headers['x-claude-key'] || process.env.ANTHROPIC_API_KEY;
   if (!anthropicKey) return res.status(400).json({ error: 'ANTHROPIC_API_KEY not configured' });
 
   const prompt = `You are analyzing a customer call transcript for ${companyName || 'a company'}.
@@ -471,7 +471,7 @@ Return ONLY a JSON array of short strings (each under 20 words), like:
 // Generate a detailed research-backed email using Claude + NewView portfolio context
 app.post('/api/research-email', async (req, res) => {
   const { companyName, domain, industry, description, funding, fundingStage, employees, ceoName, ceoFirstName, customerInsights } = req.body;
-  const anthropicKey = process.env.ANTHROPIC_API_KEY;
+  const anthropicKey = req.headers['x-claude-key'] || process.env.ANTHROPIC_API_KEY;
   if (!anthropicKey) return res.status(400).json({ error: 'ANTHROPIC_API_KEY not configured' });
 
   try {
@@ -565,7 +565,7 @@ app.delete('/api/outreach/:domain', async (req, res) => {
 // Generate a follow-up email draft for a company
 app.post('/api/follow-up-draft', async (req, res) => {
   const { ceoName, ceoEmail, companyName, industry, description, daysSince } = req.body;
-  const anthropicKey = process.env.ANTHROPIC_API_KEY;
+  const anthropicKey = req.headers['x-claude-key'] || process.env.ANTHROPIC_API_KEY;
   if (!anthropicKey) return res.status(400).json({ error: 'ANTHROPIC_API_KEY not configured' });
 
   try {
