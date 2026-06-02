@@ -1335,7 +1335,7 @@ function renderDatabase(items) {
         </div>
         <div>
           <div style="font-size:0.73rem;color:var(--muted);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:2px">Last email</div>
-          <div style="font-size:0.83rem;font-weight:500">${daysSinceLast !== null ? daysSinceLast + 'd ago' : '—'}</div>
+          <div style="font-size:0.83rem;font-weight:600;color:${daysSinceLast >= 30 ? 'var(--red)' : daysSinceLast >= 14 ? 'var(--yellow)' : 'inherit'}">${daysSinceLast !== null ? daysSinceLast + 'd ago' : '—'}</div>
         </div>
       </div>
     </div>`;
