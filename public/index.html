@@ -394,10 +394,6 @@
         <label>Affinity API Key</label>
         <input type="password" id="loginAffinityInput" placeholder="Paste your Affinity API key…" autocomplete="off" style="font-size:0.95rem;padding:10px 14px" />
       </div>
-      <div class="field">
-        <label>Claude API Key</label>
-        <input type="password" id="loginClaudeInput" placeholder="Paste your Anthropic API key…" autocomplete="off" style="font-size:0.95rem;padding:10px 14px" />
-      </div>
     </div>
     <button onclick="submitLogin()" class="btn btn-primary" style="width:100%;margin-top:20px;padding:11px;font-size:0.95rem">Get Started →</button>
     <div id="loginError" style="color:var(--red);font-size:0.8rem;margin-top:10px;display:none">Please enter your name and a valid email.</div>
@@ -442,10 +438,6 @@
       <div class="field">
         <label>Affinity API Key</label>
         <input type="password" id="affinityKeyInput" placeholder="Paste your Affinity API key…" autocomplete="off" />
-      </div>
-      <div class="field">
-        <label>Claude API Key</label>
-        <input type="password" id="claudeKeyInput" placeholder="Paste your Anthropic API key…" autocomplete="off" />
       </div>
     </div>
     <div style="display:flex;gap:8px;margin-top:12px">
@@ -733,11 +725,9 @@ function getApiKey()      { return localStorage.getItem('apollo_api_key') || '';
 function getAffinityKey() { return localStorage.getItem('affinity_api_key') || ''; }
 function getSenderName()  { return localStorage.getItem('sender_name') || ''; }
 function getUserEmail()   { return localStorage.getItem('user_email') || 'shared'; }
-function getClaudeKey()   { return localStorage.getItem('claude_api_key') || ''; }
 function userHeaders() {
   const h = { 'Content-Type': 'application/json', 'x-user-email': getUserEmail() };
   if (getAffinityKey()) h['x-affinity-key'] = getAffinityKey();
-  if (getClaudeKey())   h['x-claude-key']   = getClaudeKey();
   return h;
 }
 
@@ -754,7 +744,6 @@ function toggleSettings() {
     document.getElementById('userEmailInput').value = getUserEmail() === 'shared' ? '' : getUserEmail();
     document.getElementById('apolloKeyInput').value = getApiKey();
     document.getElementById('affinityKeyInput').value = getAffinityKey();
-    document.getElementById('claudeKeyInput').value = getClaudeKey();
     setTimeout(() => document.getElementById('senderNameInput').focus(), 300);
   }
 }
@@ -764,12 +753,10 @@ function saveSettings() {
   const userEmail   = document.getElementById('userEmailInput').value.trim();
   const apolloKey   = document.getElementById('apolloKeyInput').value.trim();
   const affinityKey = document.getElementById('affinityKeyInput').value.trim();
-  const claudeKey   = document.getElementById('claudeKeyInput').value.trim();
   if (senderName)   localStorage.setItem('sender_name', senderName);   else localStorage.removeItem('sender_name');
   if (userEmail)    localStorage.setItem('user_email', userEmail);      else localStorage.removeItem('user_email');
   if (apolloKey)    localStorage.setItem('apollo_api_key', apolloKey);  else localStorage.removeItem('apollo_api_key');
   if (affinityKey)  localStorage.setItem('affinity_api_key', affinityKey); else localStorage.removeItem('affinity_api_key');
-  if (claudeKey)    localStorage.setItem('claude_api_key', claudeKey);  else localStorage.removeItem('claude_api_key');
   updatePill(!!apolloKey);
   document.getElementById('settingsPanel').classList.remove('open');
   setStatus('Settings saved.', 'loading');
@@ -1289,14 +1276,12 @@ function submitLogin() {
   const name        = document.getElementById('loginNameInput').value.trim();
   const email       = document.getElementById('loginEmailInput').value.trim();
   const affinityKey = document.getElementById('loginAffinityInput').value.trim();
-  const claudeKey   = document.getElementById('loginClaudeInput').value.trim();
   const err         = document.getElementById('loginError');
   if (!name || !email || !email.includes('@')) { err.style.display = 'block'; return; }
   err.style.display = 'none';
   localStorage.setItem('sender_name', name);
   localStorage.setItem('user_email', email);
   if (affinityKey) localStorage.setItem('affinity_api_key', affinityKey);
-  if (claudeKey)   localStorage.setItem('claude_api_key', claudeKey);
   document.getElementById('loginOverlay').style.display = 'none';
   loadOutreachLog();
   loadFollowUps();
