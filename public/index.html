@@ -1365,7 +1365,8 @@ async function trackerMarkFollowUp(domain) {
   await fetch('/api/follow-ups/mark-sent', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ domain }) });
   await loadDatabase();
   // After re-render, find the fresh button and briefly show Completed
-  const btn = document.querySelector(`#row-${domain} button[onclick*="trackerMarkFollowUp"]`);
+  const rowEl = document.getElementById('row-' + domain);
+  const btn = rowEl ? rowEl.querySelector('button[onclick*="trackerMarkFollowUp"]') : null;
   if (btn) {
     btn.textContent = '✓ Completed';
     btn.disabled = true;
