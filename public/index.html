@@ -1394,28 +1394,38 @@ function renderDatabase(items) {
     const border = isOverdue ? 'rgba(239,68,68,0.3)' : isUpcoming ? 'rgba(245,158,11,0.3)' : 'var(--border)';
     const leftBar = isOverdue ? 'var(--red)' : isUpcoming ? 'var(--yellow)' : item.followUpSentAt ? 'var(--green)' : 'transparent';
     const d = esc(item.domain);
-    return `<div id="row-${d}" style="display:flex;align-items:center;gap:16px;background:${bg};border:1px solid ${border};border-left:3px solid ${leftBar};border-radius:12px;padding:14px 18px">
-      <div style="flex:1;min-width:0">
-        <div style="font-weight:600;font-size:0.92rem">${esc(item.companyName || item.domain)}</div>
-        <div style="font-size:0.82rem;color:var(--muted);margin-top:3px">${esc(item.ceoName || '—')}${item.ceoEmail ? ` · <a href="mailto:${esc(item.ceoEmail)}" style="color:var(--accent);text-decoration:none">${esc(item.ceoEmail)}</a>` : ''}</div>
+    return `<div id="row-${d}" style="background:${bg};border:1px solid ${border};border-left:3px solid ${leftBar};border-radius:12px;overflow:hidden">
+      <div style="display:flex;align-items:center;gap:16px;padding:14px 18px">
+        <div style="flex:1;min-width:0">
+          <div style="font-weight:600;font-size:0.92rem">${esc(item.companyName || item.domain)}</div>
+          <div style="font-size:0.82rem;color:var(--muted);margin-top:3px">${esc(item.ceoName || '—')}${item.ceoEmail ? ` · <a href="mailto:${esc(item.ceoEmail)}" style="color:var(--accent);text-decoration:none">${esc(item.ceoEmail)}</a>` : ''}</div>
+        </div>
+        <div style="display:flex;gap:36px;flex-shrink:0;text-align:right">
+          <div>
+            <div style="font-size:0.73rem;color:var(--muted);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:2px">Sent</div>
+            <div style="font-size:0.83rem;font-weight:500">${sentDateStr}</div>
+          </div>
+          <div>
+            <div style="font-size:0.73rem;color:var(--muted);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:2px">Follow-ups</div>
+            <div style="font-size:0.83rem;font-weight:500">${followUpCount}</div>
+          </div>
+          <div>
+            <div style="font-size:0.73rem;color:var(--muted);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:2px">Last email</div>
+            <div style="font-size:0.83rem;font-weight:600;color:${daysSinceLast >= 30 ? 'var(--red)' : daysSinceLast >= 14 ? 'var(--yellow)' : 'inherit'}">${daysSinceLast !== null ? daysSinceLast + 'd ago' : '—'}</div>
+          </div>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:6px;flex-shrink:0;margin-left:8px">
+          <button onclick="trackerDraftFollowUp('${d}', this)" style="font-size:0.75rem;padding:5px 10px;background:var(--surface2);border:1px solid var(--border);border-radius:7px;color:var(--text);cursor:pointer;white-space:nowrap;font-weight:500">✉ Draft</button>
+          <button onclick="trackerMarkFollowUp('${d}')" style="font-size:0.75rem;padding:5px 10px;background:var(--green-soft);border:1px solid var(--green-border);border-radius:7px;color:var(--green);cursor:pointer;white-space:nowrap;font-weight:600">✓ Sent</button>
+          <button onclick="trackerRemove('${d}')" style="font-size:0.75rem;padding:5px 10px;background:none;border:1px solid var(--border);border-radius:7px;color:var(--muted);cursor:pointer;white-space:nowrap">Remove</button>
+        </div>
       </div>
-      <div style="display:flex;gap:36px;flex-shrink:0;text-align:right">
-        <div>
-          <div style="font-size:0.73rem;color:var(--muted);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:2px">Sent</div>
-          <div style="font-size:0.83rem;font-weight:500">${sentDateStr}</div>
+      <div id="draft-${d}" style="display:none;border-top:1px solid var(--border);padding:14px 18px;background:var(--surface2)">
+        <textarea id="draft-body-${d}" style="width:100%;min-height:160px;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:10px 13px;color:var(--text);font-size:0.85rem;resize:vertical;font-family:inherit;line-height:1.5" placeholder="Generating…" readonly></textarea>
+        <div style="display:flex;gap:8px;margin-top:10px">
+          <button onclick="trackerCopyDraft('${d}')" style="font-size:0.78rem;padding:6px 14px;background:var(--accent);color:#000;border:none;border-radius:7px;cursor:pointer;font-weight:600">Copy</button>
+          ${item.ceoEmail ? `<a id="draft-mailto-${d}" href="#" style="font-size:0.78rem;padding:6px 14px;background:var(--surface);border:1px solid var(--border);border-radius:7px;color:var(--text);text-decoration:none;font-weight:500">Open in Mail</a>` : ''}
         </div>
-        <div>
-          <div style="font-size:0.73rem;color:var(--muted);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:2px">Follow-ups</div>
-          <div style="font-size:0.83rem;font-weight:500">${followUpCount}</div>
-        </div>
-        <div>
-          <div style="font-size:0.73rem;color:var(--muted);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:2px">Last email</div>
-          <div style="font-size:0.83rem;font-weight:600;color:${daysSinceLast >= 30 ? 'var(--red)' : daysSinceLast >= 14 ? 'var(--yellow)' : 'inherit'}">${daysSinceLast !== null ? daysSinceLast + 'd ago' : '—'}</div>
-        </div>
-      </div>
-      <div style="display:flex;flex-direction:column;gap:6px;flex-shrink:0;margin-left:8px">
-        <button onclick="trackerMarkFollowUp('${d}')" style="font-size:0.75rem;padding:5px 10px;background:var(--green-soft);border:1px solid var(--green-border);border-radius:7px;color:var(--green);cursor:pointer;white-space:nowrap;font-weight:600">✓ Follow-up Sent</button>
-        <button onclick="trackerRemove('${d}')" style="font-size:0.75rem;padding:5px 10px;background:none;border:1px solid var(--border);border-radius:7px;color:var(--muted);cursor:pointer;white-space:nowrap">Remove</button>
       </div>
     </div>`;
   }
@@ -1432,7 +1442,49 @@ function renderDatabase(items) {
   body.innerHTML = html;
 }
 
-async function trackerMarkFollowUp(domain) {
+async function trackerDraftFollowUp(domain, btn) {
+  const draftEl = document.getElementById('draft-' + domain);
+  const textarea = document.getElementById('draft-body-' + domain);
+  // Toggle closed if already open
+  if (draftEl.style.display !== 'none') { draftEl.style.display = 'none'; btn.textContent = '✉ Draft'; return; }
+  draftEl.style.display = 'block';
+  btn.textContent = 'Drafting…';
+  btn.disabled = true;
+  const item = _allOutreach.find(r => r.domain === domain);
+  const daysSinceLast = item?.sentAt ? Math.floor((Date.now() - new Date(item.followUpSentAt || item.sentAt).getTime()) / 86400000) : null;
+  try {
+    const res = await fetch('/api/follow-up-draft', {
+      method: 'POST',
+      headers: userHeaders(),
+      body: JSON.stringify({
+        ceoName: item?.ceoName, ceoEmail: item?.ceoEmail,
+        companyName: item?.companyName, industry: item?.industry,
+        description: item?.description, daysSince: daysSinceLast,
+      }),
+    });
+    const data = await res.json();
+    textarea.value = data.body || data.error || 'Could not generate draft';
+    textarea.readOnly = false;
+    const mailtoEl = document.getElementById('draft-mailto-' + domain);
+    if (mailtoEl && data.body) {
+      mailtoEl.href = `mailto:${item?.ceoEmail || ''}?subject=${encodeURIComponent(data.subject || 'Following up')}&body=${encodeURIComponent(data.body)}`;
+    }
+  } catch(e) {
+    textarea.value = 'Error: ' + e.message;
+  }
+  btn.textContent = '✉ Draft';
+  btn.disabled = false;
+}
+
+function trackerCopyDraft(domain) {
+  const textarea = document.getElementById('draft-body-' + domain);
+  if (!textarea?.value) return;
+  navigator.clipboard.writeText(textarea.value);
+  const btn = document.querySelector(`#row-${domain} button[onclick*="trackerCopyDraft"]`);
+  if (btn) { btn.textContent = 'Copied!'; setTimeout(() => btn.textContent = 'Copy', 2000); }
+}
+
+
   await fetch('/api/follow-ups/mark-sent', { method:'POST', headers: userHeaders(), body: JSON.stringify({ domain }) });
   await loadDatabase();
   // After re-render, find the fresh button and briefly show Completed
