@@ -40,9 +40,10 @@ app.post('/api/send-outreach', async (req, res) => {
 
   const apiKey = bodyKey || process.env.APOLLO_API_KEY || '';
   const affinityKey = bodyAffinityKey || process.env.AFFINITY_API_KEY;
+  const userEmail = req.headers['x-user-email'] || 'shared';
 
   try {
-    const result = await launchEmailOutreach({ companyData, ceoData, emailSequence, apiKey, affinityKey, senderName });
+    const result = await launchEmailOutreach({ companyData, ceoData, emailSequence, apiKey, affinityKey, senderName, userEmail });
     res.json(result);
   } catch (err) {
     console.error('[/api/send-outreach] Error:', err.message);
@@ -529,30 +530,34 @@ Reply with only the email body. Keep it tight — 3 paragraphs only.`,
 
 // Get full outreach log (all Mark as Sent entries)
 app.get('/api/outreach-log', async (req, res) => {
-  try { res.json(await tracker.getAllOutreach()); }
+  const userEmail = req.headers['x-user-email'] || 'shared';
+  try { res.json(await tracker.getAllOutreach(userEmail)); }
   catch(e) { res.status(500).json({ error: e.message }); }
 });
 
 // Get all follow-ups due (outreach sent 30+ days ago, no follow-up yet)
 app.get('/api/follow-ups', async (req, res) => {
-  try { res.json(await tracker.getFollowUpsDue()); }
+  const userEmail = req.headers['x-user-email'] || 'shared';
+  try { res.json(await tracker.getFollowUpsDue(userEmail)); }
   catch(e) { res.status(500).json({ error: e.message }); }
 });
 
 // Mark a follow-up as sent
 app.post('/api/follow-ups/mark-sent', async (req, res) => {
   const { domain } = req.body;
+  const userEmail = req.headers['x-user-email'] || 'shared';
   if (!domain) return res.status(400).json({ error: 'domain required' });
-  await tracker.markFollowUpSent(domain);
+  await tracker.markFollowUpSent(domain, userEmail);
   res.json({ ok: true });
 });
 
 // Delete an outreach entry
 app.delete('/api/outreach/:domain', async (req, res) => {
   const { domain } = req.params;
+  const userEmail = req.headers['x-user-email'] || 'shared';
   if (!domain) return res.status(400).json({ error: 'domain required' });
   try {
-    await tracker.deleteOutreach(domain);
+    await tracker.deleteOutreach(domain, userEmail);
     res.json({ ok: true });
   } catch(e) { res.status(500).json({ error: e.message }); }
 });

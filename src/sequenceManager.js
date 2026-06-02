@@ -389,7 +389,7 @@ async function runOutreachByCompany({ companyName, apiKey, affinityKey }) {
 }
 
 // Log outreach and sync to Affinity — no Apollo sequencing
-async function launchEmailOutreach({ companyData, ceoData, emailSequence, apiKey, affinityKey: passedAffinityKey, senderName }) {
+async function launchEmailOutreach({ companyData, ceoData, emailSequence, apiKey, affinityKey: passedAffinityKey, senderName, userEmail }) {
   const results = { enrolled: true, affinity: null, errors: [] };
 
   // Sync to Affinity
@@ -452,7 +452,7 @@ async function launchEmailOutreach({ companyData, ceoData, emailSequence, apiKey
   const cleanDomain = companyData?.domain ? companyData.domain.toLowerCase().replace(/^www\./, '') : null;
   if (cleanDomain) {
     try {
-      await tracker.logOutreach(cleanDomain, {
+      await tracker.logOutreach(cleanDomain, userEmail, {
         ceoName: ceoData?.name || `${ceoData?.firstName || ''} ${ceoData?.lastName || ''}`.trim() || null,
         ceoEmail: ceoData?.email || null,
         companyName: companyData?.name || null,

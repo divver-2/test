@@ -403,6 +403,10 @@
         <input type="text" id="senderNameInput" placeholder="e.g. David Divver" autocomplete="off" />
       </div>
       <div class="field">
+        <label>Your Email</label>
+        <input type="email" id="userEmailInput" placeholder="e.g. david@nvc.vc" autocomplete="off" />
+      </div>
+      <div class="field">
         <label>Apollo API Key</label>
         <input type="password" id="apolloKeyInput" placeholder="Paste your Apollo API key…" autocomplete="off" />
       </div>
@@ -695,6 +699,8 @@ async function addCompany() {
 function getApiKey()      { return localStorage.getItem('apollo_api_key') || ''; }
 function getAffinityKey() { return localStorage.getItem('affinity_api_key') || ''; }
 function getSenderName()  { return localStorage.getItem('sender_name') || 'David Divver'; }
+function getUserEmail()   { return localStorage.getItem('user_email') || 'shared'; }
+function userHeaders()    { return { 'Content-Type': 'application/json', 'x-user-email': getUserEmail() }; }
 
 function toggleSettings() {
   const panel = document.getElementById('settingsPanel');
@@ -706,6 +712,7 @@ function toggleSettings() {
     panel.classList.remove('hidden');
     requestAnimationFrame(() => requestAnimationFrame(() => panel.classList.add('open')));
     document.getElementById('senderNameInput').value = getSenderName();
+    document.getElementById('userEmailInput').value = getUserEmail() === 'shared' ? '' : getUserEmail();
     document.getElementById('apolloKeyInput').value = getApiKey();
     document.getElementById('affinityKeyInput').value = getAffinityKey();
     setTimeout(() => document.getElementById('apolloKeyInput').focus(), 300);
@@ -714,10 +721,13 @@ function toggleSettings() {
 
 function saveSettings() {
   const senderName = document.getElementById('senderNameInput').value.trim();
-  const apolloKey = document.getElementById('apolloKeyInput').value.trim();
+  const userEmail  = document.getElementById('userEmailInput').value.trim();
+  const apolloKey  = document.getElementById('apolloKeyInput').value.trim();
   const affinityKey = document.getElementById('affinityKeyInput').value.trim();
   if (senderName) localStorage.setItem('sender_name', senderName);
   else localStorage.removeItem('sender_name');
+  if (userEmail) localStorage.setItem('user_email', userEmail);
+  else localStorage.removeItem('user_email');
   if (apolloKey) localStorage.setItem('apollo_api_key', apolloKey);
   else localStorage.removeItem('apollo_api_key');
   if (affinityKey) localStorage.setItem('affinity_api_key', affinityKey);
@@ -1124,7 +1134,7 @@ function renderResult(data) {
 async function loadOutreachLog() {
   const tbody = document.getElementById('outreachLogBody');
   try {
-    const res = await fetch('/api/outreach-log');
+    const res = await fetch('/api/outreach-log', { headers: { 'x-user-email': getUserEmail() } });
     const all = await res.json();
     const items = all.slice(0, 5);
     if (!items.length) {
@@ -1185,7 +1195,7 @@ async function launchOutreach() {
   try {
     const res = await fetch('/api/send-outreach', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: userHeaders(),
       body: JSON.stringify({
         companyData: { ...currentResult.company, affinityOrgId: currentResult.affinity?.orgId || null },
         ceoData: currentResult.ceo,
@@ -1267,7 +1277,7 @@ async function loadDatabase() {
   const body = document.getElementById('databaseBody');
   body.innerHTML = `<div style="color:var(--muted);text-align:center;padding:40px">Loading…</div>`;
   try {
-    const res = await fetch('/api/outreach-log');
+    const res = await fetch('/api/outreach-log', { headers: { 'x-user-email': getUserEmail() } });
     const data = await res.json();
     _allOutreach = Array.isArray(data) ? data : [];
     renderStats(_allOutreach);
@@ -1363,7 +1373,7 @@ function renderDatabase(items) {
 }
 
 async function trackerMarkFollowUp(domain) {
-  await fetch('/api/follow-ups/mark-sent', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ domain }) });
+  await fetch('/api/follow-ups/mark-sent', { method:'POST', headers: userHeaders(), body: JSON.stringify({ domain }) });
   await loadDatabase();
   // After re-render, find the fresh button and briefly show Completed
   const rowEl = document.getElementById('row-' + domain);
@@ -1382,13 +1392,13 @@ async function trackerMarkFollowUp(domain) {
 
 async function trackerRemove(domain) {
   if (!confirm('Remove this entry from the tracker?')) return;
-  await fetch(`/api/outreach/${encodeURIComponent(domain)}`, { method:'DELETE' });
+  await fetch(`/api/outreach/${encodeURIComponent(domain)}`, { method:'DELETE', headers: { 'x-user-email': getUserEmail() } });
   await loadDatabase();
 }
 
 async function loadFollowUps() {
   try {
-    const res = await fetch('/api/follow-ups');
+    const res = await fetch('/api/follow-ups', { headers: { 'x-user-email': getUserEmail() } });
     const items = await res.json();
     const card = document.getElementById('followUpsCard');
     const list = document.getElementById('followUpsList');
@@ -1460,7 +1470,7 @@ function copyFollowUp(domain) {
 }
 
 async function markFollowUpSent(domain) {
-  await fetch('/api/follow-ups/mark-sent', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ domain }) });
+  await fetch('/api/follow-ups/mark-sent', { method: 'POST', headers: userHeaders(), body: JSON.stringify({ domain }) });
   document.getElementById(`fu-${domain}`)?.remove();
   const remaining = document.querySelectorAll('[id^="fu-"]').length;
   if (!remaining) document.getElementById('followUpsCard').style.display = 'none';
