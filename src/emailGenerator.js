@@ -59,12 +59,12 @@ function getThemeLine(industry) {
   return "I've been spending time in enterprise software and believe the next wave of B2B infrastructure is still being built";
 }
 
-async function generateInitialEmail({ ceoName, companyName, industry, description, website, senderName }) {
+async function generateInitialEmail({ ceoName, companyName, industry, description, website, senderName, claudeKey }) {
   const senderFirst = senderName ? senderName.split(' ')[0] : 'David';
   const firstName = ceoName ? ceoName.split(' ')[0] : null;
   const greeting = firstName ? `Hi ${firstName},` : 'Hi,';
 
-  const apiKey = process.env.ANTHROPIC_API_KEY;
+  const apiKey = claudeKey || process.env.ANTHROPIC_API_KEY;
 
   if (apiKey) {
     try {
@@ -204,11 +204,11 @@ ${senderName || 'Your Name'}`,
   return templates[Math.min(followUpIndex, templates.length - 1)];
 }
 
-async function buildEmailSequence({ ceoName, companyName, industry, description, website, senderName }) {
+async function buildEmailSequence({ ceoName, companyName, industry, description, website, senderName, claudeKey }) {
   const emails = [];
 
   // Email 1: Initial outreach (day 0)
-  const initial = await generateInitialEmail({ ceoName, companyName, industry, description, website, senderName });
+  const initial = await generateInitialEmail({ ceoName, companyName, industry, description, website, senderName, claudeKey });
   emails.push({ ...initial, delayDays: 0, type: 'initial' });
 
   // Emails 2-6: Follow-ups every 42 days (6 weeks)

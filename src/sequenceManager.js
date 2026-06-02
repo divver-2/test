@@ -213,7 +213,7 @@ async function runOutreachSequence({ email, senderName, apiKey }) {
 }
 
 // Enrich company by name/domain: get CEO + company info from Apollo, owner + emails from Affinity
-async function runOutreachByCompany({ companyName, apiKey, affinityKey }) {
+async function runOutreachByCompany({ companyName, apiKey, affinityKey, claudeKey }) {
   const results = { organization: null, ceo: null, affinityData: null, errors: [], usedHunter: false };
 
   // 1. If input looks like a domain, use it directly
@@ -343,6 +343,7 @@ async function runOutreachByCompany({ companyName, apiKey, affinityKey }) {
       description: results.organization?.short_description || '',
       website: results.organization?.website_url || (domain ? `https://${domain}` : null),
       senderName: 'David Divver',
+      claudeKey,
     }),
     usedAffinityKey
       ? affinity.lookupCompanyInAffinity(companyName, usedAffinityKey, domain, ceoEmail)
