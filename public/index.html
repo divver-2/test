@@ -1152,6 +1152,15 @@ function renderResult(data) {
       </div>`;
   document.getElementById('sendStatus').innerHTML = statusHtml;
 
+  const launchBtn = document.getElementById('launchBtn');
+  if (hasOwner) {
+    launchBtn.disabled = true;
+    launchBtn.title = 'Cannot send — this company has a global owner in Affinity';
+  } else {
+    launchBtn.disabled = false;
+    launchBtn.title = '';
+  }
+
   document.getElementById('resultCard').classList.remove('hidden');
 }
 
