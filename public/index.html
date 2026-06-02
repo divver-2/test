@@ -819,7 +819,7 @@ async function parseOneFile(file) {
   }
   const res = await fetch('/api/parse-transcript', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: userHeaders(),
     body: JSON.stringify(body),
   });
   const data = await res.json();

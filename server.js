@@ -11,7 +11,7 @@ const tracker = require('./src/outreachTracker');
 
 const app = express();
 app.use(cors());
-app.use(express.json());
+app.use(express.json({ limit: '20mb' }));
 app.use(express.static(path.join(__dirname, 'public')));
 
 // Company/domain lookup — enrich by name or domain, find CEO, lookup Affinity
