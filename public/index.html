@@ -375,6 +375,26 @@
 </head>
 <body>
 
+<!-- Login overlay — shown on first visit until name+email are set -->
+<div id="loginOverlay" style="display:none;position:fixed;inset:0;background:#0a0a0a;z-index:9999;align-items:center;justify-content:center">
+  <div style="background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:40px 44px;width:100%;max-width:400px;box-shadow:0 24px 60px rgba(0,0,0,0.6)">
+    <div style="font-size:1.3rem;font-weight:700;letter-spacing:-0.3px;margin-bottom:6px">Welcome</div>
+    <div style="font-size:0.85rem;color:var(--muted);margin-bottom:28px">Enter your details to get started. This keeps your outreach tracker separate from the rest of the team.</div>
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="field">
+        <label>Your Name</label>
+        <input type="text" id="loginNameInput" placeholder="e.g. David Divver" autocomplete="name" style="font-size:0.95rem;padding:10px 14px" />
+      </div>
+      <div class="field">
+        <label>Your Email</label>
+        <input type="email" id="loginEmailInput" placeholder="e.g. david@nvc.vc" autocomplete="email" style="font-size:0.95rem;padding:10px 14px" />
+      </div>
+    </div>
+    <button onclick="submitLogin()" class="btn btn-primary" style="width:100%;margin-top:20px;padding:11px;font-size:0.95rem">Get Started →</button>
+    <div id="loginError" style="color:var(--red);font-size:0.8rem;margin-top:10px;display:none">Please enter your name and a valid email.</div>
+  </div>
+</div>
+
 <!-- Header -->
 <div class="header">
   <div>
@@ -1246,12 +1266,36 @@ async function launchOutreach() {
   }
 }
 
+// ── Login ─────────────────────────────────────────────────
+function submitLogin() {
+  const name  = document.getElementById('loginNameInput').value.trim();
+  const email = document.getElementById('loginEmailInput').value.trim();
+  const err   = document.getElementById('loginError');
+  if (!name || !email || !email.includes('@')) { err.style.display = 'block'; return; }
+  err.style.display = 'none';
+  localStorage.setItem('sender_name', name);
+  localStorage.setItem('user_email', email);
+  document.getElementById('loginOverlay').style.display = 'none';
+  loadOutreachLog();
+  loadFollowUps();
+}
+
+document.getElementById('loginEmailInput')?.addEventListener('keydown', e => {
+  if (e.key === 'Enter') submitLogin();
+});
+
 // ── Init ──────────────────────────────────────────────────
 document.getElementById('companyInput').addEventListener('keydown', e => {
   if (e.key === 'Enter') addCompany();
 });
-loadOutreachLog();
-loadFollowUps();
+
+if (!localStorage.getItem('user_email')) {
+  // First visit — show login, defer data loading until after
+  document.getElementById('loginOverlay').style.display = 'flex';
+} else {
+  loadOutreachLog();
+  loadFollowUps();
+}
 
 let _allOutreach = [];
 
