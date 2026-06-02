@@ -122,6 +122,13 @@ async function getAllOutreach() {
   return rows.map(rowToObj);
 }
 
+async function deleteOutreach(domain) {
+  if (!domain) return;
+  await ensureInit();
+  const db = getPool();
+  await db.query('DELETE FROM outreach WHERE domain=$1', [domain.toLowerCase()]);
+}
+
 function rowToObj(r) {
   return {
     domain: r.domain,
@@ -139,4 +146,4 @@ function rowToObj(r) {
   };
 }
 
-module.exports = { saveTracking, getTracking, learnOrgId, getCachedOrgId, logOutreach, markFollowUpSent, getFollowUpsDue, getAllOutreach };
+module.exports = { saveTracking, getTracking, learnOrgId, getCachedOrgId, logOutreach, markFollowUpSent, getFollowUpsDue, getAllOutreach, deleteOutreach };

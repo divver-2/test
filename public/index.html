@@ -1322,7 +1322,8 @@ function renderDatabase(items) {
     const bg = isOverdue ? 'rgba(239,68,68,0.07)' : isUpcoming ? 'rgba(245,158,11,0.06)' : 'var(--surface)';
     const border = isOverdue ? 'rgba(239,68,68,0.3)' : isUpcoming ? 'rgba(245,158,11,0.3)' : 'var(--border)';
     const leftBar = isOverdue ? 'var(--red)' : isUpcoming ? 'var(--yellow)' : item.followUpSentAt ? 'var(--green)' : 'transparent';
-    return `<div style="display:flex;align-items:center;gap:16px;background:${bg};border:1px solid ${border};border-left:3px solid ${leftBar};border-radius:12px;padding:14px 18px">
+    const d = esc(item.domain);
+    return `<div id="row-${d}" style="display:flex;align-items:center;gap:16px;background:${bg};border:1px solid ${border};border-left:3px solid ${leftBar};border-radius:12px;padding:14px 18px">
       <div style="flex:1;min-width:0">
         <div style="font-weight:600;font-size:0.92rem">${esc(item.companyName || item.domain)}</div>
         <div style="font-size:0.82rem;color:var(--muted);margin-top:3px">${esc(item.ceoName || '—')}${item.ceoEmail ? ` · <a href="mailto:${esc(item.ceoEmail)}" style="color:var(--accent);text-decoration:none">${esc(item.ceoEmail)}</a>` : ''}</div>
@@ -1341,6 +1342,10 @@ function renderDatabase(items) {
           <div style="font-size:0.83rem;font-weight:600;color:${daysSinceLast >= 30 ? 'var(--red)' : daysSinceLast >= 14 ? 'var(--yellow)' : 'inherit'}">${daysSinceLast !== null ? daysSinceLast + 'd ago' : '—'}</div>
         </div>
       </div>
+      <div style="display:flex;flex-direction:column;gap:6px;flex-shrink:0;margin-left:8px">
+        ${!item.followUpSentAt ? `<button onclick="trackerMarkFollowUp('${d}')" style="font-size:0.75rem;padding:5px 10px;background:var(--green-soft);border:1px solid var(--green-border);border-radius:7px;color:var(--green);cursor:pointer;white-space:nowrap;font-weight:600">✓ Follow-up Sent</button>` : `<span style="font-size:0.75rem;color:var(--green);font-weight:600;padding:5px 10px">✓ Done</span>`}
+        <button onclick="trackerRemove('${d}')" style="font-size:0.75rem;padding:5px 10px;background:none;border:1px solid var(--border);border-radius:7px;color:var(--muted);cursor:pointer;white-space:nowrap">Remove</button>
+      </div>
     </div>`;
   }
 
@@ -1354,6 +1359,17 @@ function renderDatabase(items) {
     html += `<div style="display:flex;flex-direction:column;gap:8px">${rest.map(i => row(i)).join('')}</div>`;
   }
   body.innerHTML = html;
+}
+
+async function trackerMarkFollowUp(domain) {
+  await fetch('/api/follow-ups/mark-sent', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ domain }) });
+  await loadDatabase();
+}
+
+async function trackerRemove(domain) {
+  if (!confirm('Remove this entry from the tracker?')) return;
+  await fetch(`/api/outreach/${encodeURIComponent(domain)}`, { method:'DELETE' });
+  await loadDatabase();
 }
 
 async function loadFollowUps() {

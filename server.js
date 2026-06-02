@@ -547,6 +547,16 @@ app.post('/api/follow-ups/mark-sent', async (req, res) => {
   res.json({ ok: true });
 });
 
+// Delete an outreach entry
+app.delete('/api/outreach/:domain', async (req, res) => {
+  const { domain } = req.params;
+  if (!domain) return res.status(400).json({ error: 'domain required' });
+  try {
+    await tracker.deleteOutreach(domain);
+    res.json({ ok: true });
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
 // Generate a follow-up email draft for a company
 app.post('/api/follow-up-draft', async (req, res) => {
   const { ceoName, ceoEmail, companyName, industry, description, daysSince } = req.body;
