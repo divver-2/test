@@ -1279,14 +1279,14 @@ async function loadDatabase() {
 function renderStats(items) {
   const now = Date.now();
   const total = items.length;
-  const due = items.filter(r => !r.followUpSentAt && r.sentAt && (now - new Date(r.sentAt).getTime()) >= 30*86400000).length;
-  const done = items.filter(r => r.followUpSentAt).length;
+  const overdue = items.filter(r => !r.followUpSentAt && r.sentAt && (now - new Date(r.sentAt).getTime()) >= 30*86400000).length;
+  const upcoming = items.filter(r => !r.followUpSentAt && r.sentAt && (now - new Date(r.sentAt).getTime()) >= 14*86400000 && (now - new Date(r.sentAt).getTime()) < 30*86400000).length;
   document.getElementById('dbStats').innerHTML = [
-    { label: 'Total Sent', value: total, color: 'var(--text)' },
-    { label: 'Follow-ups Due', value: due, color: due ? 'var(--yellow)' : 'var(--text)' },
-    { label: 'Follow-ups Sent', value: done, color: 'var(--green)' },
+    { label: 'Total Sent', value: total, color: 'var(--text)', border: 'var(--border)' },
+    { label: 'Follow-ups Due', value: overdue, color: overdue ? 'var(--red)' : 'var(--text)', border: overdue ? 'rgba(239,68,68,0.3)' : 'var(--border)' },
+    { label: 'Coming Up', value: upcoming, color: upcoming ? 'var(--yellow)' : 'var(--text)', border: upcoming ? 'rgba(245,158,11,0.3)' : 'var(--border)' },
   ].map(s => `
-    <div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:18px 20px">
+    <div style="background:var(--surface);border:1px solid ${s.border};border-radius:12px;padding:18px 20px">
       <div style="font-size:1.8rem;font-weight:700;color:${s.color}">${s.value}</div>
       <div style="font-size:0.75rem;color:var(--muted);margin-top:4px;text-transform:uppercase;letter-spacing:0.06em">${s.label}</div>
     </div>`).join('');
@@ -1324,7 +1324,7 @@ function renderDatabase(items) {
         <div style="font-weight:600;font-size:0.92rem">${esc(item.companyName || item.domain)}</div>
         <div style="font-size:0.82rem;color:var(--muted);margin-top:3px">${esc(item.ceoName || '—')}${item.ceoEmail ? ` · <a href="mailto:${esc(item.ceoEmail)}" style="color:var(--accent);text-decoration:none">${esc(item.ceoEmail)}</a>` : ''}</div>
       </div>
-      <div style="display:flex;gap:24px;flex-shrink:0;text-align:right">
+      <div style="display:flex;gap:36px;flex-shrink:0;text-align:right">
         <div>
           <div style="font-size:0.73rem;color:var(--muted);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:2px">Sent</div>
           <div style="font-size:0.83rem;font-weight:500">${sentDateStr}</div>
