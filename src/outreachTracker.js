@@ -26,6 +26,7 @@ async function init() {
       description TEXT,
       sent_at TIMESTAMPTZ,
       follow_up_sent_at TIMESTAMPTZ,
+      follow_up_count INT DEFAULT 0,
       org_id TEXT,
       priority_field_value_id TEXT,
       connected_option_id TEXT,
@@ -33,6 +34,8 @@ async function init() {
       learned_at TIMESTAMPTZ
     )
   `);
+  // Add column to existing tables that predate this field
+  await db.query(`ALTER TABLE outreach ADD COLUMN IF NOT EXISTS follow_up_count INT DEFAULT 0`);
 }
 
 async function ensureInit() {
@@ -101,7 +104,7 @@ async function markFollowUpSent(domain) {
   if (!domain) return;
   await ensureInit();
   const db = getPool();
-  await db.query('UPDATE outreach SET follow_up_sent_at=NOW() WHERE domain=$1', [domain.toLowerCase()]);
+  await db.query('UPDATE outreach SET follow_up_sent_at=NOW(), follow_up_count=COALESCE(follow_up_count,0)+1 WHERE domain=$1', [domain.toLowerCase()]);
 }
 
 async function getFollowUpsDue() {
@@ -139,6 +142,7 @@ function rowToObj(r) {
     description: r.description,
     sentAt: r.sent_at,
     followUpSentAt: r.follow_up_sent_at,
+    followUpCount: r.follow_up_count || 0,
     orgId: r.org_id,
     priorityFieldValueId: r.priority_field_value_id,
     connectedOptionId: r.connected_option_id,

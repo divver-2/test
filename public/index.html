@@ -1315,7 +1315,7 @@ function renderDatabase(items) {
   function row(item) {
     const lastDate = item.followUpSentAt || item.sentAt;
     const daysSinceLast = lastDate ? Math.floor((now - new Date(lastDate).getTime()) / 86400000) : null;
-    const followUpCount = item.followUpSentAt ? 1 : 0;
+    const followUpCount = item.followUpCount || 0;
     const sentDateStr = item.sentAt ? new Date(item.sentAt).toLocaleDateString('en-US', { month:'short', day:'numeric', year:'numeric' }) : '—';
     const isOverdue = !item.followUpSentAt && daysSinceLast >= 30;
     const isUpcoming = !item.followUpSentAt && daysSinceLast >= 14 && daysSinceLast < 30;
@@ -1343,7 +1343,7 @@ function renderDatabase(items) {
         </div>
       </div>
       <div style="display:flex;flex-direction:column;gap:6px;flex-shrink:0;margin-left:8px">
-        ${!item.followUpSentAt ? `<button onclick="trackerMarkFollowUp('${d}')" style="font-size:0.75rem;padding:5px 10px;background:var(--green-soft);border:1px solid var(--green-border);border-radius:7px;color:var(--green);cursor:pointer;white-space:nowrap;font-weight:600">✓ Follow-up Sent</button>` : `<span style="font-size:0.75rem;color:var(--green);font-weight:600;padding:5px 10px">✓ Done</span>`}
+        <button onclick="trackerMarkFollowUp('${d}')" style="font-size:0.75rem;padding:5px 10px;background:var(--green-soft);border:1px solid var(--green-border);border-radius:7px;color:var(--green);cursor:pointer;white-space:nowrap;font-weight:600">✓ Follow-up Sent</button>
         <button onclick="trackerRemove('${d}')" style="font-size:0.75rem;padding:5px 10px;background:none;border:1px solid var(--border);border-radius:7px;color:var(--muted);cursor:pointer;white-space:nowrap">Remove</button>
       </div>
     </div>`;
