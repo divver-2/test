@@ -1283,10 +1283,10 @@ function renderStats(items) {
   const upcoming = items.filter(r => !r.followUpSentAt && r.sentAt && (now - new Date(r.sentAt).getTime()) >= 14*86400000 && (now - new Date(r.sentAt).getTime()) < 30*86400000).length;
   document.getElementById('dbStats').innerHTML = [
     { label: 'Total Sent', value: total, color: 'var(--text)', border: 'var(--border)' },
-    { label: 'Follow-ups Due', value: overdue, color: overdue ? 'var(--red)' : 'var(--text)', border: overdue ? 'rgba(239,68,68,0.3)' : 'var(--border)' },
-    { label: 'Coming Up', value: upcoming, color: upcoming ? 'var(--yellow)' : 'var(--text)', border: upcoming ? 'rgba(245,158,11,0.3)' : 'var(--border)' },
+    { label: 'Follow-ups Due', value: overdue, color: overdue ? 'var(--red)' : 'var(--text)', border: overdue ? 'rgba(239,68,68,0.3)' : 'var(--border)', bg: overdue ? 'rgba(239,68,68,0.07)' : 'var(--surface)' },
+    { label: 'Coming Up', value: upcoming, color: upcoming ? 'var(--yellow)' : 'var(--text)', border: upcoming ? 'rgba(245,158,11,0.3)' : 'var(--border)', bg: upcoming ? 'rgba(245,158,11,0.07)' : 'var(--surface)' },
   ].map(s => `
-    <div style="background:var(--surface);border:1px solid ${s.border};border-radius:12px;padding:18px 20px">
+    <div style="background:${s.bg};border:1px solid ${s.border};border-radius:12px;padding:18px 20px">
       <div style="font-size:1.8rem;font-weight:700;color:${s.color}">${s.value}</div>
       <div style="font-size:0.75rem;color:var(--muted);margin-top:4px;text-transform:uppercase;letter-spacing:0.06em">${s.label}</div>
     </div>`).join('');
@@ -1312,14 +1312,17 @@ function renderDatabase(items) {
   const due = items.filter(r => !r.followUpSentAt && r.sentAt && (now - new Date(r.sentAt).getTime()) >= 30*86400000);
   const rest = items.filter(r => !due.includes(r));
 
-  function row(item, highlight) {
+  function row(item) {
     const lastDate = item.followUpSentAt || item.sentAt;
     const daysSinceLast = lastDate ? Math.floor((now - new Date(lastDate).getTime()) / 86400000) : null;
     const followUpCount = item.followUpSentAt ? 1 : 0;
     const sentDateStr = item.sentAt ? new Date(item.sentAt).toLocaleDateString('en-US', { month:'short', day:'numeric', year:'numeric' }) : '—';
-    const emailHref = item.ceoEmail ? `mailto:${item.ceoEmail}` : null;
-    const border = highlight ? 'border-left:3px solid var(--yellow)' : item.followUpSentAt ? 'border-left:3px solid var(--green)' : 'border-left:3px solid transparent';
-    return `<div style="display:flex;align-items:center;gap:16px;background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:14px 18px;${border}">
+    const isOverdue = !item.followUpSentAt && daysSinceLast >= 30;
+    const isUpcoming = !item.followUpSentAt && daysSinceLast >= 14 && daysSinceLast < 30;
+    const bg = isOverdue ? 'rgba(239,68,68,0.07)' : isUpcoming ? 'rgba(245,158,11,0.06)' : 'var(--surface)';
+    const border = isOverdue ? 'rgba(239,68,68,0.3)' : isUpcoming ? 'rgba(245,158,11,0.3)' : 'var(--border)';
+    const leftBar = isOverdue ? 'var(--red)' : isUpcoming ? 'var(--yellow)' : item.followUpSentAt ? 'var(--green)' : 'transparent';
+    return `<div style="display:flex;align-items:center;gap:16px;background:${bg};border:1px solid ${border};border-left:3px solid ${leftBar};border-radius:12px;padding:14px 18px">
       <div style="flex:1;min-width:0">
         <div style="font-weight:600;font-size:0.92rem">${esc(item.companyName || item.domain)}</div>
         <div style="font-size:0.82rem;color:var(--muted);margin-top:3px">${esc(item.ceoName || '—')}${item.ceoEmail ? ` · <a href="mailto:${esc(item.ceoEmail)}" style="color:var(--accent);text-decoration:none">${esc(item.ceoEmail)}</a>` : ''}</div>
@@ -1344,11 +1347,11 @@ function renderDatabase(items) {
   let html = '';
   if (due.length) {
     html += `<div style="font-size:0.75rem;font-weight:700;text-transform:uppercase;letter-spacing:0.07em;color:var(--yellow);margin-bottom:10px">Follow-ups Due (${due.length})</div>`;
-    html += `<div style="display:flex;flex-direction:column;gap:8px;margin-bottom:28px">${due.map(i => row(i, true)).join('')}</div>`;
+    html += `<div style="display:flex;flex-direction:column;gap:8px;margin-bottom:28px">${due.map(i => row(i)).join('')}</div>`;
   }
   if (rest.length) {
     html += `<div style="font-size:0.75rem;font-weight:700;text-transform:uppercase;letter-spacing:0.07em;color:var(--muted);margin-bottom:10px">All Outreach</div>`;
-    html += `<div style="display:flex;flex-direction:column;gap:8px">${rest.map(i => row(i, false)).join('')}</div>`;
+    html += `<div style="display:flex;flex-direction:column;gap:8px">${rest.map(i => row(i)).join('')}</div>`;
   }
   body.innerHTML = html;
 }
