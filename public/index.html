@@ -541,7 +541,7 @@
   <!-- Outreach log -->
   <div class="card">
     <div class="history-head">
-      <h2>Outreach Log</h2>
+      <h2>Recent Companies</h2>
     </div>
     <div class="table-wrap">
       <table>
@@ -1125,7 +1125,8 @@ async function loadOutreachLog() {
   const tbody = document.getElementById('outreachLogBody');
   try {
     const res = await fetch('/api/outreach-log');
-    const items = await res.json();
+    const all = await res.json();
+    const items = all.slice(0, 5);
     if (!items.length) {
       tbody.innerHTML = `<tr><td colspan="5" style="color:var(--muted);text-align:center;padding:20px">No outreach logged yet — click Mark as Sent after sending an email</td></tr>`;
       return;
