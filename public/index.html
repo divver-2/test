@@ -1364,6 +1364,18 @@ function renderDatabase(items) {
 async function trackerMarkFollowUp(domain) {
   await fetch('/api/follow-ups/mark-sent', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ domain }) });
   await loadDatabase();
+  // After re-render, find the fresh button and briefly show Completed
+  const btn = document.querySelector(`#row-${domain} button[onclick*="trackerMarkFollowUp"]`);
+  if (btn) {
+    btn.textContent = '✓ Completed';
+    btn.disabled = true;
+    btn.style.opacity = '0.7';
+    setTimeout(() => {
+      btn.textContent = '✓ Follow-up Sent';
+      btn.disabled = false;
+      btn.style.opacity = '1';
+    }, 30000);
+  }
 }
 
 async function trackerRemove(domain) {
