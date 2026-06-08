@@ -626,13 +626,5 @@ const PORT = process.env.PORT || 3006;
 app.listen(PORT, () => {
   console.log(`\nCEO Outreach Tool running at http://localhost:${PORT}\n`);
 
-  // Poll Apollo for replies every hour and sync Affinity status automatically
-  const POLL_INTERVAL_MS = 60 * 60 * 1000; // 1 hour
-  setInterval(async () => {
-    console.log('[auto-poll] Checking Apollo for replies...');
-    const result = await syncRepliesFromApollo();
-    if (result.updated.length > 0) {
-      console.log(`[auto-poll] Updated ${result.updated.length} Affinity record(s) to Connected`);
-    }
-  }, POLL_INTERVAL_MS);
+  // Apollo reply polling removed — sequences no longer used
 });
