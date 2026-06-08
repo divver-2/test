@@ -3,6 +3,8 @@ const { Pool } = require('pg');
 const FOLLOWUP_DAYS = 30;
 
 let pool;
+let initialized = false;
+
 function getPool() {
   if (!pool) {
     const url = process.env.DATABASE_URL;
@@ -35,17 +37,12 @@ async function init() {
       PRIMARY KEY (domain, user_email)
     )
   `);
-  // Migrations for existing tables
   await db.query(`ALTER TABLE outreach ADD COLUMN IF NOT EXISTS follow_up_count INT DEFAULT 0`);
-  await db.query(`ALTER TABLE outreach ADD COLUMN IF NOT EXISTS user_email TEXT NOT NULL DEFAULT 'shared'`);
-  try {
-    await db.query(`ALTER TABLE outreach DROP CONSTRAINT IF EXISTS outreach_pkey`);
-    await db.query(`ALTER TABLE outreach ADD PRIMARY KEY (domain, user_email)`);
-  } catch(e) { /* already migrated */ }
 }
 
 async function ensureInit() {
-  try { await init(); } catch(e) { console.error('[tracker] DB init error:', e.message || e.code || String(e)); }
+  if (initialized) return;
+  try { await init(); initialized = true; } catch(e) { console.error('[tracker] DB init error:', e.message || e.code || String(e)); }
 }
 
 async function logOutreach(domain, userEmail, { ceoName, ceoEmail, companyName, industry, description }) {
