@@ -1201,9 +1201,6 @@ function extractAffinityId(input) {
 async function launchOutreach() {
   if (!currentResult) return;
 
-  const apiKey = getApiKey();
-  if (!apiKey) { setStatus('Please enter your Apollo API key in Settings (⚙ top right).', 'error'); return; }
-
   // Use the (possibly manually edited) email field
   const emailInput = document.getElementById('ceoEmail').value.trim();
   if (!emailInput) {
@@ -1477,7 +1474,7 @@ function trackerCopyDraft(domain) {
   if (btn) { btn.textContent = 'Copied!'; setTimeout(() => btn.textContent = 'Copy', 2000); }
 }
 
-
+async function trackerMarkFollowUp(domain) {
   await fetch('/api/follow-ups/mark-sent', { method:'POST', headers: userHeaders(), body: JSON.stringify({ domain }) });
   await loadDatabase();
   // After re-render, find the fresh button and briefly show Completed
