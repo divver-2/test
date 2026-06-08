@@ -1224,7 +1224,6 @@ async function launchOutreach() {
         companyData: { ...currentResult.company, affinityOrgId: currentResult.affinity?.orgId || null },
         ceoData: currentResult.ceo,
         emailSequence: currentResult.emailSequence,
-        apiKey,
         affinityKey: getAffinityKey(),
         senderName: getSenderName(),
       }),
