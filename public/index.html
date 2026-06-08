@@ -661,12 +661,6 @@ async function addCompany() {
 
   if (!companyName) { setStatus('Please enter a company name.', 'error'); return; }
 
-  const apiKey = getApiKey();
-  if (!apiKey) {
-    setStatus('Please enter your Apollo API key in Settings (⚙ top right).', 'error');
-    return;
-  }
-
   document.getElementById('resultCard').classList.add('hidden');
   document.getElementById('researchEmailSection').style.display = 'none';
   document.getElementById('researchBody').value = '';
@@ -681,8 +675,8 @@ async function addCompany() {
   try {
     const res = await fetch('/api/company', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ companyName, apiKey, affinityKey: getAffinityKey() }),
+      headers: userHeaders(),
+      body: JSON.stringify({ companyName }),
     });
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || 'Lookup failed');
