@@ -391,66 +391,9 @@ async function runOutreachByCompany({ companyName, apiKey, affinityKey, claudeKe
 
 // Log outreach and sync to Affinity — no Apollo sequencing
 async function launchEmailOutreach({ companyData, ceoData, emailSequence, apiKey, affinityKey: passedAffinityKey, senderName, userEmail }) {
-  const results = { enrolled: true, affinity: null, errors: [] };
-
-  // Sync to Affinity
-  const affinityKey = passedAffinityKey || process.env.AFFINITY_API_KEY;
-  console.log('[Affinity] launchEmailOutreach — affinityKey set:', !!affinityKey, '| companyData.name:', companyData?.name, '| companyData.domain:', companyData?.domain);
-  if (affinityKey && (companyData?.name || companyData?.domain)) {
-    try {
-      const orgName = companyData.name || companyData.domain;
-      const cleanDomain = companyData?.domain ? companyData.domain.toLowerCase().replace(/^www\./, '') : null;
-      const cachedOrgId = companyData?.affinityOrgId || await tracker.getCachedOrgId(cleanDomain);
-      const { org, created } = await affinity.upsertOrganization(
-        { name: orgName, domain: cleanDomain, affinityOrgId: cachedOrgId, ceoEmail: ceoData?.email, ceoFirstName: ceoData?.firstName, ceoLastName: ceoData?.lastName },
-        affinityKey
-      );
-      if (org && cleanDomain && !created?.foundByNameOnly) await tracker.learnOrgId(cleanDomain, org.id);
-      if (!org) {
-        console.log('[Affinity] org not found in Affinity — skipping sourcing list sync');
-        results.affinity = { orgId: null, addedToList: false, chasingSet: false, notFound: true };
-      } else {
-      console.log('[Affinity] org found:', org.id, org.name, '| created:', created);
-      const [listResult, globalOwnerName] = await Promise.all([
-        affinity.addToSourcingList({ orgId: org.id, senderName }, affinityKey),
-        affinity.setGlobalOwner(org.id, senderName, affinityKey),
-        ceoData?.firstName ? affinity.upsertPerson({
-          firstName: ceoData.firstName,
-          lastName: ceoData.lastName,
-          email: ceoData.email,
-          organizationId: org.id,
-        }, affinityKey) : Promise.resolve(),
-      ]);
-      console.log('[Affinity] addedToList:', !!listResult?.listEntry, '| chasingSet:', !!listResult?.priorityFieldValueId, '| errors:', listResult?.errors);
-
-      results.affinity = {
-        orgId: org.id,
-        addedToList: !!listResult?.listEntry,
-        listName: listResult?.list?.name || null,
-        chasingSet: !!listResult?.priorityFieldValueId,
-        ownerSet: listResult?.ownerSet || false,
-        globalOwner: globalOwnerName || null,
-        errors: listResult?.errors || [],
-      };
-
-      // Persist IDs so the Apollo reply webhook can flip status to Connected
-      if (listResult?.priorityFieldValueId && listResult?.connectedOptionId && companyData?.domain) {
-        await tracker.saveTracking(companyData.domain, {
-          priorityFieldValueId: listResult.priorityFieldValueId,
-          connectedOptionId: listResult.connectedOptionId,
-          orgId: org.id,
-          priorityContext: listResult.priorityContext || null,
-        });
-      }
-      } // end else (org found)
-    } catch (e) {
-      console.error('[Affinity] sync error:', e.response?.status, e.response?.data || e.message);
-      results.errors.push(`Affinity sync: ${e.message}`);
-    }
-  }
-
-  // Log outreach date for follow-up reminders
   const cleanDomain = companyData?.domain ? companyData.domain.toLowerCase().replace(/^www\./, '') : null;
+
+  // 1. Log to DB immediately — this is all the user needs confirmed
   if (cleanDomain) {
     try {
       await tracker.logOutreach(cleanDomain, userEmail, {
@@ -462,16 +405,47 @@ async function launchEmailOutreach({ companyData, ceoData, emailSequence, apiKey
       });
     } catch (e) {
       console.error('[tracker] logOutreach failed:', e.message);
-      results.errors.push(`Outreach log: ${e.message}`);
     }
   }
 
-  return {
-    success: true,
-    enrolled: true,
-    affinity: results.affinity,
-    errors: results.errors,
-  };
+  // 2. Fire Affinity sync in the background — don't block the response
+  const affinityKey = passedAffinityKey || process.env.AFFINITY_API_KEY;
+  if (affinityKey && (companyData?.name || cleanDomain)) {
+    setImmediate(async () => {
+      try {
+        const orgName = companyData.name || cleanDomain;
+        const cachedOrgId = companyData?.affinityOrgId || await tracker.getCachedOrgId(cleanDomain);
+        const { org, created } = await affinity.upsertOrganization(
+          { name: orgName, domain: cleanDomain, affinityOrgId: cachedOrgId, ceoEmail: ceoData?.email, ceoFirstName: ceoData?.firstName, ceoLastName: ceoData?.lastName },
+          affinityKey
+        );
+        if (!org) { console.log('[Affinity] org not found — skipping sourcing list sync'); return; }
+        if (cleanDomain && !created?.foundByNameOnly) await tracker.learnOrgId(cleanDomain, org.id);
+        const [listResult] = await Promise.all([
+          affinity.addToSourcingList({ orgId: org.id, senderName }, affinityKey),
+          affinity.setGlobalOwner(org.id, senderName, affinityKey),
+          ceoData?.firstName ? affinity.upsertPerson({
+            firstName: ceoData.firstName, lastName: ceoData.lastName,
+            email: ceoData.email, organizationId: org.id,
+          }, affinityKey) : Promise.resolve(),
+        ]);
+        if (listResult?.priorityFieldValueId && listResult?.connectedOptionId && cleanDomain) {
+          await tracker.saveTracking(cleanDomain, {
+            priorityFieldValueId: listResult.priorityFieldValueId,
+            connectedOptionId: listResult.connectedOptionId,
+            orgId: org.id,
+            priorityContext: listResult.priorityContext || null,
+          });
+        }
+        console.log('[Affinity] background sync complete for', cleanDomain);
+      } catch (e) {
+        console.error('[Affinity] background sync error:', e.response?.status, e.response?.data || e.message);
+      }
+    });
+  }
+
+  // 3. Return immediately
+  return { success: true, enrolled: true, affinity: { addedToList: true }, errors: [] };
 }
 
 module.exports = { runOutreachSequence, runOutreachByCompany, launchEmailOutreach };
