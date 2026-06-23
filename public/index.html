@@ -423,6 +423,7 @@
       <div class="draft-actions">
         <button class="btn-copy" onclick="copyEmail()">Copy Email</button>
         <a class="btn-mailto" id="mailtoLink" href="#">Open in Email App</a>
+        <button class="btn-copy" id="markSentBtn" onclick="markEmailSent()" style="background:rgba(16,185,129,0.15);border-color:rgba(16,185,129,0.3);color:#6ee7b7">✓ Mark as Sent</button>
       </div>
     </div>
   </div>
@@ -430,7 +431,7 @@
   <!-- History table -->
   <div class="card">
     <div class="history-head">
-      <h2>Added Companies</h2>
+      <h2>Outreach Tracker</h2>
       <span class="count-pill" id="countPill">0 companies</span>
     </div>
     <div class="table-wrap">
@@ -445,6 +446,7 @@
             <th>Funding</th>
             <th>Affinity Owner</th>
             <th>Emails Sent</th>
+            <th>Status</th>
             <th>Added</th>
           </tr>
         </thead>
@@ -458,6 +460,7 @@
 <script>
 // ── State ────────────────────────────────────────────────
 let history = [];
+let currentHistoryIdx = -1;
 try { history = JSON.parse(localStorage.getItem('outreach_history') || '[]'); } catch(e) {}
 
 // ── Helpers ───────────────────────────────────────────────
@@ -504,6 +507,8 @@ async function addCompany() {
   document.getElementById('resultCard').classList.add('hidden');
   setStatus(`Looking up <strong>${esc(companyName)}</strong>…`, 'loading');
   document.getElementById('addBtn').disabled = true;
+  const sentBtn = document.getElementById('markSentBtn');
+  if (sentBtn) { sentBtn.textContent = '✓ Mark as Sent'; sentBtn.disabled = false; sentBtn.style.opacity = '1'; }
 
   try {
     const res = await fetch('/api/company', {
@@ -516,6 +521,7 @@ async function addCompany() {
 
     renderResult(data);
 
+    currentHistoryIdx = history.length;
     history.push({
       company:        data.company?.name || companyName,
       domain:         data.company?.domain,
@@ -730,9 +736,23 @@ function renderHistory() {
         <td>${h.funding ? `<span class="badge badge-accent">$${esc(h.funding)}</span>` : '<span style="color:var(--muted)">—</span>'}</td>
         <td>${h.affinityOwner ? `<span class="badge badge-accent">${esc(h.affinityOwner)}</span>` : '<span style="color:var(--muted)">—</span>'}</td>
         <td>${h.affinityEmails > 0 ? `<span class="badge badge-green">${h.affinityEmails} sent</span>` : '<span class="badge badge-gray">None</span>'}</td>
+        <td>${h.emailSent ? `<span class="badge badge-green">✓ Sent ${h.emailSentDate ? fmtDate(h.emailSentDate) : ''}</span>` : '<span class="badge badge-gray">Not Sent</span>'}</td>
         <td class="td-date">${fmtDate(h.addedAt)}</td>
       </tr>`;
   }).join('');
+}
+
+// ── Mark Email Sent ───────────────────────────────────────
+function markEmailSent() {
+  if (currentHistoryIdx < 0 || currentHistoryIdx >= history.length) return;
+  history[currentHistoryIdx].emailSent = true;
+  history[currentHistoryIdx].emailSentDate = new Date().toISOString();
+  localStorage.setItem('outreach_history', JSON.stringify(history));
+  renderHistory();
+  const btn = document.getElementById('markSentBtn');
+  btn.textContent = '✓ Sent!';
+  btn.disabled = true;
+  btn.style.opacity = '0.5';
 }
 
 // ── Mark Connected ────────────────────────────────────────
