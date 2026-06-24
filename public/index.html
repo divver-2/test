@@ -460,7 +460,7 @@
 <script>
 // ── State ────────────────────────────────────────────────
 let history = [];
-let currentHistoryIdx = -1;
+let currentResult = null;
 try { history = JSON.parse(localStorage.getItem('outreach_history') || '[]'); } catch(e) {}
 
 // ── Helpers ───────────────────────────────────────────────
@@ -521,8 +521,7 @@ async function addCompany() {
 
     renderResult(data);
 
-    currentHistoryIdx = history.length;
-    history.push({
+    currentResult = {
       company:        data.company?.name || companyName,
       domain:         data.company?.domain,
       logo:           data.company?.logo,
@@ -536,10 +535,7 @@ async function addCompany() {
       affinityOwner:  data.affinity?.owner || null,
       affinityEmails: data.affinity?.emailsSent || 0,
       inAffinity:     data.affinity?.inAffinity || false,
-      addedAt:        new Date().toISOString(),
-    });
-    localStorage.setItem('outreach_history', JSON.stringify(history));
-    renderHistory();
+    };
     clearStatus();
     document.getElementById('companyInput').value = '';
   } catch(e) {
@@ -744,13 +740,19 @@ function renderHistory() {
 
 // ── Mark Email Sent ───────────────────────────────────────
 function markEmailSent() {
-  if (currentHistoryIdx < 0 || currentHistoryIdx >= history.length) return;
-  history[currentHistoryIdx].emailSent = true;
-  history[currentHistoryIdx].emailSentDate = new Date().toISOString();
+  if (!currentResult) return;
+  const entry = {
+    ...currentResult,
+    emailSent: true,
+    emailSentDate: new Date().toISOString(),
+    addedAt: new Date().toISOString(),
+  };
+  history.push(entry);
   localStorage.setItem('outreach_history', JSON.stringify(history));
   renderHistory();
+  currentResult = null;
   const btn = document.getElementById('markSentBtn');
-  btn.textContent = '✓ Sent!';
+  btn.textContent = '✓ Added to Tracker!';
   btn.disabled = true;
   btn.style.opacity = '0.5';
 }
