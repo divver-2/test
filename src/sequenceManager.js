@@ -262,15 +262,11 @@ async function runOutreachByCompany({ companyName }) {
     senderName: 'David Divver',
   });
 
-  // 5. Lookup in Affinity + set global owner
+  // 5. Lookup in Affinity (read-only, no owner override)
   const affinityKey = process.env.AFFINITY_API_KEY;
   if (affinityKey) {
     try {
       results.affinityData = await affinity.lookupCompanyInAffinity(orgName, affinityKey);
-      if (results.affinityData?.orgId) {
-        const ownerSet = await affinity.setGlobalOwner(results.affinityData.orgId, 'David Divver', affinityKey);
-        if (ownerSet) results.affinityData.owner = ownerSet;
-      }
     } catch (e) {
       results.errors.push(`Affinity lookup failed: ${e.message}`);
     }
