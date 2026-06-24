@@ -740,7 +740,27 @@ function renderHistory() {
 
 // ── Mark Email Sent ───────────────────────────────────────
 function markEmailSent() {
-  if (!currentResult) return;
+  // Read from DOM as fallback if currentResult is missing
+  if (!currentResult) {
+    const name = document.getElementById('cName')?.textContent;
+    const domain = document.getElementById('cDomain')?.textContent;
+    if (!name && !domain) { alert('Please look up a company first.'); return; }
+    currentResult = {
+      company:       name || domain,
+      domain:        domain,
+      logo:          null,
+      ceoName:       document.getElementById('ceoName')?.textContent,
+      ceoEmail:      document.getElementById('ceoEmail')?.textContent,
+      ceoLinkedin:   document.getElementById('linkedinBtn')?.href || null,
+      emailVerified: document.getElementById('emailBadge')?.textContent?.includes('verified'),
+      industry:      null,
+      funding:       null,
+      fundingStage:  null,
+      affinityOwner: null,
+      affinityEmails: 0,
+      inAffinity:    false,
+    };
+  }
   const entry = {
     ...currentResult,
     emailSent: true,
