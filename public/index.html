@@ -1146,13 +1146,8 @@ function renderResult(data) {
       </div>`;
   document.getElementById('sendStatus').innerHTML = statusHtml;
 
-  if (hasOwner) {
-    launchBtn.disabled = true;
-    launchBtn.title = 'Cannot send — this company has a global owner in Affinity';
-  } else {
-    launchBtn.disabled = false;
-    launchBtn.title = '';
-  }
+  launchBtn.disabled = false;
+  launchBtn.title = hasOwner ? 'This company has a global owner in Affinity — proceed with caution' : '';
 
   document.getElementById('resultCard').classList.remove('hidden');
 }
@@ -1237,13 +1232,12 @@ async function launchOutreach() {
       sendStatusEl.innerHTML = `<div class="send-status send-status-ok" style="margin:0 0 14px">
         <span class="send-status-icon">✅</span>
         <div>
-          <div>Outreach logged — opening tracker…</div>
-          <div class="send-status-sub">${esc(currentResult.ceo.email)} · follow-up reminder set for 30 days</div>
+          <div>Outreach logged</div>
+          <div class="send-status-sub">${esc(currentResult.ceo.email)} · follow-up reminder set for 30 days · added to tracker</div>
         </div>
       </div>`;
       loadOutreachLog();
       loadFollowUps();
-      setTimeout(() => showView('database'), 600);
     } else {
       const errs = data.errors?.join(', ') || 'Unknown error';
       sendStatusEl.innerHTML = `<div class="send-status send-status-warn" style="margin:0 0 14px">
