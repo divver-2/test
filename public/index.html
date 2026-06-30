@@ -1233,23 +1233,17 @@ async function launchOutreach() {
 
     const sendStatusEl = document.getElementById('sendStatus');
     if (data.enrolled) {
-      const aff = data.affinity;
-      const affLine = aff?.addedToList
-        ? `Added to <b>${esc(aff.listName || 'Sourcing List')}</b>${aff.chasingSet ? ' · Status: <b>Chasing</b>' : ''}${aff.globalOwner ? ` · Owner: <b>${esc(aff.globalOwner)}</b>` : ''}`
-        : aff?.notFound
-        ? `<span style="color:var(--muted)">Company not found in Affinity — sourcing list not updated</span>`
-        : (aff ? `<span style="color:var(--yellow)">⚠ Affinity: ${esc((aff.errors || []).join(', ') || 'not added to list')}</span>` : '');
+      btn.textContent = 'Sent ✓';
       sendStatusEl.innerHTML = `<div class="send-status send-status-ok" style="margin:0 0 14px">
         <span class="send-status-icon">✅</span>
         <div>
-          <div>Outreach logged</div>
-          <div class="send-status-sub">${esc(currentResult.ceo.email)} — follow-up reminder set for 30 days</div>
-          ${affLine ? `<div class="send-status-sub" style="margin-top:4px">${affLine}</div>` : ''}
+          <div>Outreach logged — opening tracker…</div>
+          <div class="send-status-sub">${esc(currentResult.ceo.email)} · follow-up reminder set for 30 days</div>
         </div>
       </div>`;
-      btn.textContent = 'Sent ✓';
       loadOutreachLog();
       loadFollowUps();
+      setTimeout(() => showView('database'), 600);
     } else {
       const errs = data.errors?.join(', ') || 'Unknown error';
       sendStatusEl.innerHTML = `<div class="send-status send-status-warn" style="margin:0 0 14px">

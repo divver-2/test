@@ -34,7 +34,7 @@ app.post('/api/company', async (req, res) => {
   }
 });
 
-// Send outreach — create Apollo CRM records, build sequence with email steps, enroll contact
+// Mark as Sent — log outreach to DB and sync to Affinity sourcing list (no auto-email)
 app.post('/api/send-outreach', async (req, res) => {
   const { companyData, ceoData, emailSequence, apiKey: bodyKey, affinityKey: bodyAffinityKey, senderName } = req.body;
   if (!ceoData?.email) return res.status(400).json({ error: 'ceoData.email is required' });
